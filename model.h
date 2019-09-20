@@ -33,7 +33,7 @@ public:
 	bool gammaCorrection;
 
 	// Functions
-	Model(char* path) {
+	Model(string const &path, bool gamma = false) : gammaCorrection(gamma){
 		loadModel(path);
 	}
 
@@ -44,9 +44,6 @@ public:
 	}
 
 private:
-	// Model Data
-	vector<Mesh> meshes;
-	string directory;
 	// Functions
 	void loadModel(string path) {
 		Assimp::Importer import;
