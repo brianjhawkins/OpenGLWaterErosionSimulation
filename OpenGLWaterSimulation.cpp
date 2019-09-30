@@ -7,6 +7,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/noise.hpp>
+#include <glm/gtx/normal.hpp>
 
 #include "shader.h"
 #include "camera.h"
@@ -22,7 +23,7 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
 unsigned int loadTexture(const char* path);
-vector<Vertex> GenerateMeshVertices(unsigned int width, unsigned int height);
+vector<Vertex> GenerateMeshVertices(unsigned int width, unsigned int height, vector<unsigned int> indices);
 vector<unsigned int> GenerateMeshIndices(unsigned int width, unsigned int height);
 vector<Texture> GenerateMeshTextures(unsigned int width, unsigned int height);
 void GenerateBaseTextures(unsigned int width, unsigned int height);
@@ -45,12 +46,12 @@ float lastFrame = 0.0f;
 glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
 
 // mesh settings
-const unsigned int MESH_WIDTH = 128;
+const unsigned int MESH_WIDTH = 256;
 const unsigned int MESH_HEIGHT = MESH_WIDTH;
 const unsigned int MESH_TOTAL_SIZE = 5;
 const float MESH_SCALE = (float)MESH_TOTAL_SIZE / (float)MESH_WIDTH;
-vector<unsigned char> baseDiffuseTexture(MESH_WIDTH * MESH_HEIGHT * 4);
-vector<unsigned char> baseSpecularTexture(MESH_WIDTH * MESH_HEIGHT * 4);
+static vector<unsigned char> baseDiffuseTexture(MESH_WIDTH * MESH_HEIGHT * 4);
+static vector<unsigned char> baseSpecularTexture(MESH_WIDTH * MESH_HEIGHT * 4);
 
 // texture settings
 const GLenum TEXTURE_FORMAT = GL_RGBA;
@@ -108,8 +109,8 @@ int main()
 	// ------------------------------------------------------------------
 	Model ourModel("nanosuit/nanosuit.obj");
 
-	vector<Vertex> meshVertices = GenerateMeshVertices(MESH_WIDTH, MESH_HEIGHT);
 	vector<unsigned int> meshIndices = GenerateMeshIndices(MESH_WIDTH, MESH_HEIGHT);
+	vector<Vertex> meshVertices = GenerateMeshVertices(MESH_WIDTH, MESH_HEIGHT, meshIndices);
 	vector<Texture> meshTextures = GenerateMeshTextures(MESH_WIDTH, MESH_HEIGHT);
 
 	Mesh baseMesh(meshVertices, meshIndices, meshTextures);
@@ -137,7 +138,7 @@ int main()
 		ourShader.use();
 		// set shader properties
 		ourShader.setVec3("viewPos", camera.Position);
-		ourShader.setFloat("material.shininess", 32.0f);
+		ourShader.setFloat("material.shininess", 4.0f);
 		ourShader.setVec3("dirLight.direction", -0.2f, -1.0f, -0.3f);
 		ourShader.setVec3("dirLight.ambient", 0.3f, 0.3f, 0.3f);
 		ourShader.setVec3("dirLight.diffuse", 0.4f, 0.4f, 0.4f);
@@ -279,17 +280,46 @@ unsigned int loadTexture(char const* path) {
 	return textureID;
 }
 
-vector<Vertex> GenerateMeshVertices(unsigned int width, unsigned int height) {
+vector<Vertex> GenerateMeshVertices(unsigned int width, unsigned int height, vector<unsigned int> indices) {
 	vector<Vertex> vertexList;
 	Vertex newVertex;
+	unsigned int index;
+	float noiseValue;
+	float iCoord;
+	float jCoord;
 
+	// Generate vertex positions first
+	// Used to calculate correct normal values later
 	for (int j = 0; j < height; j++) {
 		for (int i = 0; i < width; i++) {
-			newVertex.Position = glm::vec3(i * MESH_SCALE, 0, -j * MESH_SCALE);
-			newVertex.Normal = glm::vec3(0, 1, 0);
-			newVertex.TexCoords = glm::vec2(i / width, j / height);
+			index = i + j * width;
+			
+			iCoord = (float)i / width;
+			jCoord = (float)j / height;
+			noiseValue = glm::perlin(glm::tvec2<float, glm::precision::highp>(iCoord, jCoord)) + 0.5f * glm::perlin(glm::tvec2<float, glm::precision::highp>(2 * iCoord, 2 * jCoord)) + 0.25f * glm::perlin(glm::tvec2<float, glm::precision::highp>(4 * iCoord, 4 * jCoord));
+			newVertex.Position = glm::vec3(i * MESH_SCALE, noiseValue, -j * MESH_SCALE);
+			newVertex.Normal = glm::vec3(0.0f, 1.0f, 0.0f); // temporary normal value, will be changed below
+			newVertex.TexCoords = glm::vec2((float)i / (width - 1), (float)j / (height - 1));
+
 			vertexList.push_back(newVertex);
 		}
+	}
+
+	glm::vec3 pointA;
+	glm::vec3 pointB;
+	glm::vec3 pointC;
+	glm::vec3 normal;
+
+	// Calculate Normals and add new vertex into vertexList
+	for (int i = 0; i < indices.size(); i += 3) {
+		pointA = vertexList[indices[i + 0]].Position;
+		pointB = vertexList[indices[i + 1]].Position;
+		pointC = vertexList[indices[i + 2]].Position;
+	
+		normal = glm::triangleNormal(pointA, pointB, pointC);
+		vertexList[indices[i + 0]].Normal = normal;
+		vertexList[indices[i + 1]].Normal = normal;
+		vertexList[indices[i + 2]].Normal = normal;
 	}
 
 	return vertexList;
@@ -328,12 +358,11 @@ vector<Texture> GenerateMeshTextures(unsigned int width, unsigned int height) {
 
 	glGenTextures(1, &diffuseTextureID);
 	glBindTexture(GL_TEXTURE_2D, diffuseTextureID);
-	glTexImage2D(GL_TEXTURE_2D, 0, TEXTURE_FORMAT, width, height, 0, TEXTURE_FORMAT, GL_UNSIGNED_BYTE, &baseDiffuseTexture);
-	glGenerateMipmap(GL_TEXTURE_2D);
+	glTexImage2D(GL_TEXTURE_2D, 0, TEXTURE_FORMAT, width, height, 0, TEXTURE_FORMAT, GL_UNSIGNED_BYTE, &baseDiffuseTexture[0]);
 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
 	diffuseTexture.id = diffuseTextureID;
@@ -344,12 +373,11 @@ vector<Texture> GenerateMeshTextures(unsigned int width, unsigned int height) {
 
 	glGenTextures(1, &specularTextureID);
 	glBindTexture(GL_TEXTURE_2D, specularTextureID);
-	glTexImage2D(GL_TEXTURE_2D, 0, TEXTURE_FORMAT, width, height, 0, TEXTURE_FORMAT, GL_UNSIGNED_BYTE, &baseSpecularTexture);
-	glGenerateMipmap(GL_TEXTURE_2D);
+	glTexImage2D(GL_TEXTURE_2D, 0, TEXTURE_FORMAT, width, height, 0, TEXTURE_FORMAT, GL_UNSIGNED_BYTE, &baseSpecularTexture[0]);
 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
 	specularTexture.id = specularTextureID;
@@ -369,16 +397,16 @@ void GenerateBaseTextures(unsigned int width, unsigned int height) {
 			location = (i + j * width) * 4;
 
 			// diffuse texture
-			baseDiffuseTexture[location + 0] = 0; // R
-			baseDiffuseTexture[location + 1] = 0; // G
-			baseDiffuseTexture[location + 2] = 1; // B
-			baseDiffuseTexture[location + 3] = 1; // A
+			baseDiffuseTexture[location + 0] = 0.7f * 255; // R
+			baseDiffuseTexture[location + 1] = 0.55f * 255; // G
+			baseDiffuseTexture[location + 2] = 0.35f * 255; // B
+			baseDiffuseTexture[location + 3] = 1 * 255; // A
 
 			// specular texture
-			baseSpecularTexture[location + 0] = 0; // R
-			baseSpecularTexture[location + 1] = 0; // G
-			baseSpecularTexture[location + 2] = 0; // B
-			baseSpecularTexture[location + 3] = 0; // A
+			baseSpecularTexture[location + 0] = 0 * 255; // R
+			baseSpecularTexture[location + 1] = 0 * 255; // G
+			baseSpecularTexture[location + 2] = 0 * 255; // B
+			baseSpecularTexture[location + 3] = 0 * 255; // A
 		}
 	}
 }
