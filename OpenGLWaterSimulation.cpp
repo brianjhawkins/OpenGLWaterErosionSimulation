@@ -48,13 +48,18 @@ glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
 // mesh settings
 const unsigned int MESH_WIDTH = 256;
 const unsigned int MESH_HEIGHT = MESH_WIDTH;
-const unsigned int MESH_TOTAL_SIZE = 5;
+const unsigned int MESH_TOTAL_SIZE = 10;
 const float MESH_SCALE = (float)MESH_TOTAL_SIZE / (float)MESH_WIDTH;
-static vector<unsigned char> baseDiffuseTexture(MESH_WIDTH * MESH_HEIGHT * 4);
-static vector<unsigned char> baseSpecularTexture(MESH_WIDTH * MESH_HEIGHT * 4);
+
+// texture settings
+const float HEIGHT_SCALING_VALUE = 5.0f;
+static vector<float> baseDiffuseTexture(MESH_WIDTH * MESH_HEIGHT * 4);
+static vector<float> baseSpecularTexture(MESH_WIDTH * MESH_HEIGHT * 4);
+unsigned int diffuseTextureID, specularTextureID;
 
 // texture settings
 const GLenum TEXTURE_FORMAT = GL_RGBA;
+const GLenum INTERNAL_TEXTURE_FORMAT = GL_RGBA32F;
 
 // debug settings
 bool drawPolygon = false;
@@ -103,7 +108,7 @@ int main()
 
 	// build and compile our shader zprogram
 	// ------------------------------------
-	Shader ourShader("4.6.model_loading.vs", "4.6.model_loading.fs");
+	Shader terrainRenderShader("terrainRender.vs", "terrainRender.fs");
 
 	// set up vertex data (and buffer(s)) and configure vertex attributes
 	// ------------------------------------------------------------------
@@ -135,22 +140,27 @@ int main()
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);	
 
 		// activate shader
-		ourShader.use();
+		terrainRenderShader.use();
 		// set shader properties
-		ourShader.setVec3("viewPos", camera.Position);
-		ourShader.setFloat("material.shininess", 4.0f);
-		ourShader.setVec3("dirLight.direction", -0.2f, -1.0f, -0.3f);
-		ourShader.setVec3("dirLight.ambient", 0.3f, 0.3f, 0.3f);
-		ourShader.setVec3("dirLight.diffuse", 0.4f, 0.4f, 0.4f);
-		ourShader.setVec3("dirLight.specular", 0.5f, 0.5f, 0.5f);
+		terrainRenderShader.setVec3("viewPos", camera.Position);
+		terrainRenderShader.setFloat("size", MESH_TOTAL_SIZE);
+		terrainRenderShader.setFloat("terrainTexture", diffuseTextureID);
+		terrainRenderShader.setFloat("terrainShininess", 1.0f);
+		terrainRenderShader.setFloat("waterShininess", 64.0f);
+		terrainRenderShader.setVec3("terrainColor", 0.7f, 0.6f, 0.35f);
+		terrainRenderShader.setVec3("waterColor", 0.0f, 0.0f, 0.7f);
+		terrainRenderShader.setVec3("dirLight.direction", -0.0f, -1.0f, -0.0f);
+		terrainRenderShader.setVec3("dirLight.ambient", 0.3f, 0.3f, 0.3f);
+		terrainRenderShader.setVec3("dirLight.diffuse", 0.4f, 0.4f, 0.4f);
+		terrainRenderShader.setVec3("dirLight.specular", 0.5f, 0.5f, 0.5f);
 
 		// pass projection matrix to shader (note that in this case it could change every frame)
 		glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
-		ourShader.setMat4("projection", projection);
+		terrainRenderShader.setMat4("projection", projection);
 
 		// camera/view transformation
 		glm::mat4 view = camera.GetViewMatrix();
-		ourShader.setMat4("view", view);
+		terrainRenderShader.setMat4("view", view);
 
 		// world transformation
 		//glm::mat4 model = glm::mat4(1.0f);
@@ -161,8 +171,8 @@ int main()
 		
 		glm::mat4 model = glm::mat4(1.0f);
 		model = glm::translate(model, glm::vec3(-(float)MESH_TOTAL_SIZE / (float)2, 0.0f, (float)MESH_TOTAL_SIZE / (float)2));
-		ourShader.setMat4("model", model);
-		baseMesh.Draw(ourShader);
+		terrainRenderShader.setMat4("model", model);
+		baseMesh.Draw(terrainRenderShader);
 
 		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
 		// -------------------------------------------------------------------------------
@@ -284,42 +294,19 @@ vector<Vertex> GenerateMeshVertices(unsigned int width, unsigned int height, vec
 	vector<Vertex> vertexList;
 	Vertex newVertex;
 	unsigned int index;
-	float noiseValue;
-	float iCoord;
-	float jCoord;
 
 	// Generate vertex positions first
 	// Used to calculate correct normal values later
 	for (int j = 0; j < height; j++) {
 		for (int i = 0; i < width; i++) {
 			index = i + j * width;
-			
-			iCoord = (float)i / width;
-			jCoord = (float)j / height;
-			noiseValue = glm::perlin(glm::tvec2<float, glm::precision::highp>(iCoord, jCoord)) + 0.5f * glm::perlin(glm::tvec2<float, glm::precision::highp>(2 * iCoord, 2 * jCoord)) + 0.25f * glm::perlin(glm::tvec2<float, glm::precision::highp>(4 * iCoord, 4 * jCoord));
-			newVertex.Position = glm::vec3(i * MESH_SCALE, noiseValue, -j * MESH_SCALE);
-			newVertex.Normal = glm::vec3(0.0f, 1.0f, 0.0f); // temporary normal value, will be changed below
+
+			newVertex.Position = glm::vec3(i * MESH_SCALE, 0, -j * MESH_SCALE);
+			newVertex.Normal = glm::vec3(0.0f, 1.0f, 0.0f);
 			newVertex.TexCoords = glm::vec2((float)i / (width - 1), (float)j / (height - 1));
 
 			vertexList.push_back(newVertex);
 		}
-	}
-
-	glm::vec3 pointA;
-	glm::vec3 pointB;
-	glm::vec3 pointC;
-	glm::vec3 normal;
-
-	// Calculate Normals and add new vertex into vertexList
-	for (int i = 0; i < indices.size(); i += 3) {
-		pointA = vertexList[indices[i + 0]].Position;
-		pointB = vertexList[indices[i + 1]].Position;
-		pointC = vertexList[indices[i + 2]].Position;
-	
-		normal = glm::triangleNormal(pointA, pointB, pointC);
-		vertexList[indices[i + 0]].Normal = normal;
-		vertexList[indices[i + 1]].Normal = normal;
-		vertexList[indices[i + 2]].Normal = normal;
 	}
 
 	return vertexList;
@@ -352,13 +339,12 @@ vector<Texture> GenerateMeshTextures(unsigned int width, unsigned int height) {
 	vector<Texture> textureList;
 	Texture diffuseTexture;
 	Texture specularTexture;
-	unsigned int diffuseTextureID, specularTextureID;
 
 	GenerateBaseTextures(width, height);
 
 	glGenTextures(1, &diffuseTextureID);
 	glBindTexture(GL_TEXTURE_2D, diffuseTextureID);
-	glTexImage2D(GL_TEXTURE_2D, 0, TEXTURE_FORMAT, width, height, 0, TEXTURE_FORMAT, GL_UNSIGNED_BYTE, &baseDiffuseTexture[0]);
+	glTexImage2D(GL_TEXTURE_2D, 0, INTERNAL_TEXTURE_FORMAT, width, height, 0, TEXTURE_FORMAT, GL_FLOAT, &baseDiffuseTexture[0]);
 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -373,7 +359,7 @@ vector<Texture> GenerateMeshTextures(unsigned int width, unsigned int height) {
 
 	glGenTextures(1, &specularTextureID);
 	glBindTexture(GL_TEXTURE_2D, specularTextureID);
-	glTexImage2D(GL_TEXTURE_2D, 0, TEXTURE_FORMAT, width, height, 0, TEXTURE_FORMAT, GL_UNSIGNED_BYTE, &baseSpecularTexture[0]);
+	glTexImage2D(GL_TEXTURE_2D, 0, INTERNAL_TEXTURE_FORMAT, width, height, 0, TEXTURE_FORMAT, GL_FLOAT, &baseSpecularTexture[0]);
 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -396,17 +382,29 @@ void GenerateBaseTextures(unsigned int width, unsigned int height) {
 		for (int i = 0; i < width; i++) {
 			location = (i + j * width) * 4;
 
+			float iCoord = (float)i / (width - 1);
+			float jCoord = (float)j / (height - 1);
+			float noiseValue = glm::perlin(glm::tvec2<float, glm::precision::highp>(iCoord, jCoord)) + 0.5f * glm::perlin(glm::tvec2<float, glm::precision::highp>(2 * iCoord, 2 * jCoord)) + 0.25f * glm::perlin(glm::tvec2<float, glm::precision::highp>(4 * iCoord, 4 * jCoord));
+			float waterValue = 0.0f;
+
+			if (i < (float)width / 4) {
+				waterValue = 0.1f;
+			}
+
+			noiseValue /= HEIGHT_SCALING_VALUE;
+			waterValue /= HEIGHT_SCALING_VALUE;
+
 			// diffuse texture
-			baseDiffuseTexture[location + 0] = 0.7f * 255; // R
-			baseDiffuseTexture[location + 1] = 0.55f * 255; // G
-			baseDiffuseTexture[location + 2] = 0.35f * 255; // B
-			baseDiffuseTexture[location + 3] = 1 * 255; // A
+			baseDiffuseTexture[location + 0] = waterValue; // R = water height value
+			baseDiffuseTexture[location + 1] = noiseValue; // G = terrain height value
+			baseDiffuseTexture[location + 2] = 0.0f; // B = dissolved sediment value
+			baseDiffuseTexture[location + 3] = 1.0f; // A
 
 			// specular texture
-			baseSpecularTexture[location + 0] = 0 * 255; // R
-			baseSpecularTexture[location + 1] = 0 * 255; // G
-			baseSpecularTexture[location + 2] = 0 * 255; // B
-			baseSpecularTexture[location + 3] = 0 * 255; // A
+			baseSpecularTexture[location + 0] = 0; // R
+			baseSpecularTexture[location + 1] = 0; // G
+			baseSpecularTexture[location + 2] = 0; // B
+			baseSpecularTexture[location + 3] = 0; // A
 		}
 	}
 }
