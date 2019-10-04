@@ -25,13 +25,20 @@ void main()
 	vec3 newNormal;
 	vec2 textureSize = textureSize(terrainTexture, 0);
 	vec2 texelSize = vec2(1.0f / textureSize.x, 1.0f / textureSize.y);
-	vec4 adjacentTerrainTextureValue1 = textureOffset(terrainTexture, aTexCoords, ivec2(1, 0));
-	vec4 adjacentTerrainTextureValue2 = textureOffset(terrainTexture, aTexCoords, ivec2(0, 1));
-	float height1 = (adjacentTerrainTextureValue1.x + adjacentTerrainTextureValue1.y) * size;
-	float height2 = (adjacentTerrainTextureValue2.x + adjacentTerrainTextureValue2.y) * size;
-	vec3 tangent1 = normalize(vec3(texelSize.x, height1 - newY, 0));
-	vec3 tangent2 = normalize(vec3(0, height1 - newY, texelSize.y));
-	newNormal = normalize(cross(tangent2, tangent1));
+	vec2 left = textureOffset(terrainTexture, aTexCoords, ivec2(-1, 0)).xy;
+	vec2 right = textureOffset(terrainTexture, aTexCoords, ivec2(1, 0)).xy;
+	vec2 up = textureOffset(terrainTexture, aTexCoords, ivec2(0, 1)).xy;
+	vec2 down = textureOffset(terrainTexture, aTexCoords, ivec2(0, -1)).xy;
+	float leftHeight = (left.x + left.y) * size;
+	float rightHeight = (right.x + right.y) * size;
+	float upHeight = (up.x + up.y) * size;
+	float downHeight = (down.x + down.y) * size;
+	vec3 vLeft = normalize(vec3(-texelSize.x, leftHeight - newY, 0.0f));
+	vec3 vRight = normalize(vec3(texelSize.x, rightHeight - newY, 0.0f));
+	vec3 vUp = normalize(vec3(0.0f, upHeight - newY, texelSize.y));
+	vec3 vDown = normalize(vec3(0.0f, downHeight - newY, -texelSize.y));
+	vec3 averageNormal = (cross(vUp, vRight) + cross(vRight, vDown) + cross(vDown, vLeft) + cross(vLeft, vUp)) / -4;
+	newNormal = normalize(averageNormal);
 
     gl_Position = projection * view * model * vec4(newPosition, 1.0);
 	Normal = mat3(transpose(inverse(model))) * newNormal;

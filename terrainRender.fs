@@ -39,7 +39,7 @@ void main()
 	// Directional Light
 	vec3 result = CalcDirLight(dirLight, norm, viewDir);
 
-	FragColor = vec4(result, 1.0f);
+	FragColor = normalize(vec4(result, 1.0f));
 }
 
 vec3 CalcDirLight(DirLight light, vec3 normal, vec3 viewDir){
@@ -69,5 +69,5 @@ vec3 CalcDirLight(DirLight light, vec3 normal, vec3 viewDir){
 	vec3 diffuse = light.diffuse * diff * renderColor;
 	vec3 specular = light.specular * spec * vec3(texture(material.texture_specular1, TexCoords));
 
-	return (ambient + diffuse + specular);
+	return normalize(ambient + diffuse + specular);
 }

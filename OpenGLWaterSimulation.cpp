@@ -109,6 +109,7 @@ int main()
 	// build and compile our shader zprogram
 	// ------------------------------------
 	Shader terrainRenderShader("terrainRender.vs", "terrainRender.fs");
+	Shader normalShader("displayNormals.vs", "displayNormals.fs", "displayNormals.gs");
 
 	// set up vertex data (and buffer(s)) and configure vertex attributes
 	// ------------------------------------------------------------------
@@ -151,8 +152,8 @@ int main()
 		terrainRenderShader.setVec3("waterColor", 0.0f, 0.0f, 0.7f);
 		terrainRenderShader.setVec3("dirLight.direction", -0.0f, -1.0f, -0.0f);
 		terrainRenderShader.setVec3("dirLight.ambient", 0.3f, 0.3f, 0.3f);
-		terrainRenderShader.setVec3("dirLight.diffuse", 0.4f, 0.4f, 0.4f);
-		terrainRenderShader.setVec3("dirLight.specular", 0.5f, 0.5f, 0.5f);
+		terrainRenderShader.setVec3("dirLight.diffuse", 0.6f, 0.6f, 0.6f);
+		terrainRenderShader.setVec3("dirLight.specular", 0.7f, 0.7f, 0.7f);
 
 		// pass projection matrix to shader (note that in this case it could change every frame)
 		glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
@@ -173,6 +174,13 @@ int main()
 		model = glm::translate(model, glm::vec3(-(float)MESH_TOTAL_SIZE / (float)2, 0.0f, (float)MESH_TOTAL_SIZE / (float)2));
 		terrainRenderShader.setMat4("model", model);
 		baseMesh.Draw(terrainRenderShader);
+
+		// display normals with normalShader
+		normalShader.use();
+		normalShader.setMat4("projection", projection);
+		normalShader.setMat4("view", view);
+		normalShader.setMat4("model", model);
+		//baseMesh.Draw(normalShader);
 
 		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
 		// -------------------------------------------------------------------------------
@@ -309,6 +317,13 @@ vector<Vertex> GenerateMeshVertices(unsigned int width, unsigned int height, vec
 		}
 	}
 
+	for (int i = 0; i < indices.size(); i += 3) {
+		glm::vec3 normal = glm::triangleNormal(vertexList[indices[i]].Position, vertexList[indices[i + 1]].Position, vertexList[indices[i + 2]].Position);
+		vertexList[indices[i]].Normal = normal;
+		vertexList[indices[i+1]].Normal = normal;
+		vertexList[indices[i+2]].Normal = normal;
+	}
+
 	return vertexList;
 }
 
@@ -385,6 +400,7 @@ void GenerateBaseTextures(unsigned int width, unsigned int height) {
 			float iCoord = (float)i / (width - 1);
 			float jCoord = (float)j / (height - 1);
 			float noiseValue = glm::perlin(glm::tvec2<float, glm::precision::highp>(iCoord, jCoord)) + 0.5f * glm::perlin(glm::tvec2<float, glm::precision::highp>(2 * iCoord, 2 * jCoord)) + 0.25f * glm::perlin(glm::tvec2<float, glm::precision::highp>(4 * iCoord, 4 * jCoord));
+			noiseValue += 1;
 			float waterValue = 0.0f;
 
 			if (i < (float)width / 4) {
@@ -401,10 +417,10 @@ void GenerateBaseTextures(unsigned int width, unsigned int height) {
 			baseDiffuseTexture[location + 3] = 1.0f; // A
 
 			// specular texture
-			baseSpecularTexture[location + 0] = 0; // R
-			baseSpecularTexture[location + 1] = 0; // G
-			baseSpecularTexture[location + 2] = 0; // B
-			baseSpecularTexture[location + 3] = 0; // A
+			baseSpecularTexture[location + 0] = 0.0f; // R
+			baseSpecularTexture[location + 1] = 0.0f; // G
+			baseSpecularTexture[location + 2] = 0.0f; // B
+			baseSpecularTexture[location + 3] = 0.0f; // A
 		}
 	}
 }
