@@ -5,12 +5,6 @@ in vec3 Normal;
 in vec3 FragPos;
 in vec2 TexCoords;
 
-struct Material{
-	sampler2D texture_diffuse1;
-	sampler2D texture_specular1;
-	float shininess;
-};
-
 struct DirLight{
 	vec3 direction;
 
@@ -18,10 +12,11 @@ struct DirLight{
 	vec3 ambient;
 	vec3 diffuse;
 	vec3 specular;
+	vec3 lightColor;
 };
 
 uniform vec3 viewPos;
-uniform Material material;
+uniform sampler2D terrainTexture;
 uniform vec3 terrainColor;
 uniform vec3 waterColor;
 uniform float terrainShininess;
@@ -44,7 +39,7 @@ void main()
 
 vec3 CalcDirLight(DirLight light, vec3 normal, vec3 viewDir){
 	vec3 lightDir = normalize(-light.direction);
-	vec4 terrainValue = texture(material.texture_diffuse1, TexCoords);
+	vec4 terrainValue = texture(terrainTexture, TexCoords);
 	vec3 renderColor;
 	float shininess;
 	
@@ -67,7 +62,7 @@ vec3 CalcDirLight(DirLight light, vec3 normal, vec3 viewDir){
 	// Combine Results
 	vec3 ambient = light.ambient * renderColor;
 	vec3 diffuse = light.diffuse * diff * renderColor;
-	vec3 specular = light.specular * spec * vec3(texture(material.texture_specular1, TexCoords));
+	vec3 specular = light.specular * spec * dirLight.lightColor;
 
 	return normalize(ambient + diffuse + specular);
 }

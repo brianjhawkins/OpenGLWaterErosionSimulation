@@ -23,9 +23,9 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
 unsigned int loadTexture(const char* path);
-vector<Vertex> GenerateMeshVertices(unsigned int width, unsigned int height, vector<unsigned int> indices);
+vector<float> GenerateMeshVertices(unsigned int width, unsigned int height);
 vector<unsigned int> GenerateMeshIndices(unsigned int width, unsigned int height);
-vector<Texture> GenerateMeshTextures(unsigned int width, unsigned int height);
+void GenerateMeshTextures(unsigned int width, unsigned int height);
 void GenerateBaseTextures(unsigned int width, unsigned int height);
 
 // window settings
@@ -50,12 +50,17 @@ const unsigned int MESH_WIDTH = 256;
 const unsigned int MESH_HEIGHT = MESH_WIDTH;
 const unsigned int MESH_TOTAL_SIZE = 10;
 const float MESH_SCALE = (float)MESH_TOTAL_SIZE / (float)MESH_WIDTH;
+unsigned int meshVAO, meshVBO, meshEBO;
 
 // texture settings
 const float HEIGHT_SCALING_VALUE = 5.0f;
-static vector<float> baseDiffuseTexture(MESH_WIDTH * MESH_HEIGHT * 4);
-static vector<float> baseSpecularTexture(MESH_WIDTH * MESH_HEIGHT * 4);
-unsigned int diffuseTextureID, specularTextureID;
+vector<float> CDTexture(MESH_WIDTH * MESH_HEIGHT * 4);
+vector<float> FTexture(MESH_WIDTH * MESH_HEIGHT * 4);
+vector<float> VTexture(MESH_WIDTH * MESH_HEIGHT * 4);
+unsigned int CDTextureID, FTextureID, VTextureID;
+
+// frame buffer settings
+unsigned int CDFBO, FFBO, VFBO;
 
 // texture settings
 const GLenum TEXTURE_FORMAT = GL_RGBA;
@@ -108,6 +113,7 @@ int main()
 
 	// build and compile our shader zprogram
 	// ------------------------------------
+	Shader waterIncrementShader("waterIncrement.vs", "waterIncrement.fs");
 	Shader terrainRenderShader("terrainRender.vs", "terrainRender.fs");
 	Shader normalShader("displayNormals.vs", "displayNormals.fs", "displayNormals.gs");
 
@@ -116,10 +122,61 @@ int main()
 	Model ourModel("nanosuit/nanosuit.obj");
 
 	vector<unsigned int> meshIndices = GenerateMeshIndices(MESH_WIDTH, MESH_HEIGHT);
-	vector<Vertex> meshVertices = GenerateMeshVertices(MESH_WIDTH, MESH_HEIGHT, meshIndices);
-	vector<Texture> meshTextures = GenerateMeshTextures(MESH_WIDTH, MESH_HEIGHT);
+	vector<float> meshVertices = GenerateMeshVertices(MESH_WIDTH, MESH_HEIGHT);
+	GenerateMeshTextures(MESH_WIDTH, MESH_HEIGHT);
+	
+	// Create mesh vertex array buffer
+	glGenVertexArrays(1, &meshVAO);
+	glGenBuffers(1, &meshVBO);
+	glGenBuffers(1, &meshEBO);
 
-	Mesh baseMesh(meshVertices, meshIndices, meshTextures);
+	glBindVertexArray(meshVAO);
+	glBindBuffer(GL_ARRAY_BUFFER, meshVBO);
+
+	glBufferData(GL_ARRAY_BUFFER, meshVertices.size() * sizeof(float), &meshVertices[0], GL_STATIC_DRAW);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, meshEBO);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, meshIndices.size() * sizeof(unsigned int), &meshIndices[0], GL_STATIC_DRAW);
+
+	// vertex positions
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+	// vertex texture coords
+	glEnableVertexAttribArray(1);
+	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+
+	glBindVertexArray(0);
+
+	// Create framebuffers for textures
+	// column data framebuffer
+	glGenFramebuffers(1, &CDFBO);
+	glBindFramebuffer(GL_FRAMEBUFFER, CDFBO);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, CDTextureID, 0);
+
+	// check that framebuffer was successfully completed
+	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+		cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << endl;
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	// flux framebuffer
+	glGenFramebuffers(1, &FFBO);
+	glBindFramebuffer(GL_FRAMEBUFFER, FFBO);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, FTextureID, 0);
+
+	// check that framebuffer was successfully completed
+	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+		cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << endl;
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	// velocity framebuffer
+	glGenFramebuffers(1, &VFBO);
+	glBindFramebuffer(GL_FRAMEBUFFER, VFBO);
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, VTextureID, 0);
+
+	// check that framebuffer was successfully completed
+	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+		cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << endl;
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 	// render loop
 	// -----------
@@ -135,17 +192,30 @@ int main()
 		// -----
 		processInput(window);
 
+		// First Pass: Water Increment Step
+		glBindFramebuffer(GL_FRAMEBUFFER, CDFBO);
+		waterIncrementShader.use();
+		waterIncrementShader.setFloat("CDTexture", CDTextureID);
+		glBindVertexArray(meshVAO);
+		glBindTexture(GL_TEXTURE_2D, CDTextureID);
+		glDrawElements(GL_TRIANGLES, meshIndices.size(), GL_UNSIGNED_INT, 0);
+		glBindVertexArray(0);
+
+		// Bind back to default frame buffer
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		
+		// Final Pass: Terrain Render Step
 		// render
 		// ------
 		glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);	
 
-		// activate shader
+		// activate terrain render shader
 		terrainRenderShader.use();
 		// set shader properties
 		terrainRenderShader.setVec3("viewPos", camera.Position);
 		terrainRenderShader.setFloat("size", MESH_TOTAL_SIZE);
-		terrainRenderShader.setFloat("terrainTexture", diffuseTextureID);
+		terrainRenderShader.setFloat("terrainTexture", CDTextureID);
 		terrainRenderShader.setFloat("terrainShininess", 1.0f);
 		terrainRenderShader.setFloat("waterShininess", 64.0f);
 		terrainRenderShader.setVec3("terrainColor", 0.7f, 0.6f, 0.35f);
@@ -154,6 +224,7 @@ int main()
 		terrainRenderShader.setVec3("dirLight.ambient", 0.3f, 0.3f, 0.3f);
 		terrainRenderShader.setVec3("dirLight.diffuse", 0.6f, 0.6f, 0.6f);
 		terrainRenderShader.setVec3("dirLight.specular", 0.7f, 0.7f, 0.7f);
+		terrainRenderShader.setVec3("dirLight.lightColor", 1.0f, 1.0f, 1.0f);
 
 		// pass projection matrix to shader (note that in this case it could change every frame)
 		glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
@@ -173,13 +244,20 @@ int main()
 		glm::mat4 model = glm::mat4(1.0f);
 		model = glm::translate(model, glm::vec3(-(float)MESH_TOTAL_SIZE / (float)2, 0.0f, (float)MESH_TOTAL_SIZE / (float)2));
 		terrainRenderShader.setMat4("model", model);
-		baseMesh.Draw(terrainRenderShader);
+		
+		// bind texture
+		glBindTexture(GL_TEXTURE_2D, CDTextureID);
+
+		// render mesh
+		glBindVertexArray(meshVAO);
+		glDrawElements(GL_TRIANGLES, meshIndices.size(), GL_UNSIGNED_INT, 0);
+		glBindVertexArray(0);
 
 		// display normals with normalShader
-		normalShader.use();
-		normalShader.setMat4("projection", projection);
-		normalShader.setMat4("view", view);
-		normalShader.setMat4("model", model);
+		//normalShader.use();
+		//normalShader.setMat4("projection", projection);
+		//normalShader.setMat4("view", view);
+		//normalShader.setMat4("model", model);
 		//baseMesh.Draw(normalShader);
 
 		// glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
@@ -298,30 +376,21 @@ unsigned int loadTexture(char const* path) {
 	return textureID;
 }
 
-vector<Vertex> GenerateMeshVertices(unsigned int width, unsigned int height, vector<unsigned int> indices) {
-	vector<Vertex> vertexList;
-	Vertex newVertex;
-	unsigned int index;
+vector<float> GenerateMeshVertices(unsigned int width, unsigned int height) {
+	vector<float> vertexList;
 
-	// Generate vertex positions first
-	// Used to calculate correct normal values later
+	// Generate vertex positions and texture coordinates
 	for (int j = 0; j < height; j++) {
 		for (int i = 0; i < width; i++) {
-			index = i + j * width;
+			// vertex position
+			vertexList.push_back(i * MESH_SCALE);
+			vertexList.push_back(0);
+			vertexList.push_back(-j * MESH_SCALE);
 
-			newVertex.Position = glm::vec3(i * MESH_SCALE, 0, -j * MESH_SCALE);
-			newVertex.Normal = glm::vec3(0.0f, 1.0f, 0.0f);
-			newVertex.TexCoords = glm::vec2((float)i / (width - 1), (float)j / (height - 1));
-
-			vertexList.push_back(newVertex);
+			// vertex texture coordinate
+			vertexList.push_back((float)i / (width - 1));
+			vertexList.push_back((float)j / (height - 1));
 		}
-	}
-
-	for (int i = 0; i < indices.size(); i += 3) {
-		glm::vec3 normal = glm::triangleNormal(vertexList[indices[i]].Position, vertexList[indices[i + 1]].Position, vertexList[indices[i + 2]].Position);
-		vertexList[indices[i]].Normal = normal;
-		vertexList[indices[i+1]].Normal = normal;
-		vertexList[indices[i+2]].Normal = normal;
 	}
 
 	return vertexList;
@@ -350,44 +419,38 @@ vector<unsigned int> GenerateMeshIndices(unsigned int width, unsigned int height
 	return indexList;
 }
 
-vector<Texture> GenerateMeshTextures(unsigned int width, unsigned int height) {
-	vector<Texture> textureList;
-	Texture diffuseTexture;
-	Texture specularTexture;
-
+void GenerateMeshTextures(unsigned int width, unsigned int height) {
 	GenerateBaseTextures(width, height);
 
-	glGenTextures(1, &diffuseTextureID);
-	glBindTexture(GL_TEXTURE_2D, diffuseTextureID);
-	glTexImage2D(GL_TEXTURE_2D, 0, INTERNAL_TEXTURE_FORMAT, width, height, 0, TEXTURE_FORMAT, GL_FLOAT, &baseDiffuseTexture[0]);
+	// column data texture binding
+	glGenTextures(1, &CDTextureID);
+	glBindTexture(GL_TEXTURE_2D, CDTextureID);
+	glTexImage2D(GL_TEXTURE_2D, 0, INTERNAL_TEXTURE_FORMAT, width, height, 0, TEXTURE_FORMAT, GL_FLOAT, &CDTexture[0]);
 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-	diffuseTexture.id = diffuseTextureID;
-	diffuseTexture.type = "texture_diffuse";
-	diffuseTexture.path = "";
-
-	textureList.push_back(diffuseTexture);
-
-	glGenTextures(1, &specularTextureID);
-	glBindTexture(GL_TEXTURE_2D, specularTextureID);
-	glTexImage2D(GL_TEXTURE_2D, 0, INTERNAL_TEXTURE_FORMAT, width, height, 0, TEXTURE_FORMAT, GL_FLOAT, &baseSpecularTexture[0]);
+	// flux texture binding
+	glGenTextures(1, &FTextureID);
+	glBindTexture(GL_TEXTURE_2D, FTextureID);
+	glTexImage2D(GL_TEXTURE_2D, 0, INTERNAL_TEXTURE_FORMAT, width, height, 0, TEXTURE_FORMAT, GL_FLOAT, &FTexture[0]);
 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-	specularTexture.id = specularTextureID;
-	specularTexture.type = "texture_specular";
-	specularTexture.path = "";
+	// velocity texture binding
+	glGenTextures(1, &VTextureID);
+	glBindTexture(GL_TEXTURE_2D, VTextureID);
+	glTexImage2D(GL_TEXTURE_2D, 0, INTERNAL_TEXTURE_FORMAT, width, height, 0, TEXTURE_FORMAT, GL_FLOAT, &VTexture[0]);
 
-	textureList.push_back(specularTexture);
-
-	return textureList;
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 }
 
 void GenerateBaseTextures(unsigned int width, unsigned int height) {
@@ -401,26 +464,26 @@ void GenerateBaseTextures(unsigned int width, unsigned int height) {
 			float jCoord = (float)j / (height - 1);
 			float noiseValue = glm::perlin(glm::tvec2<float, glm::precision::highp>(iCoord, jCoord)) + 0.5f * glm::perlin(glm::tvec2<float, glm::precision::highp>(2 * iCoord, 2 * jCoord)) + 0.25f * glm::perlin(glm::tvec2<float, glm::precision::highp>(4 * iCoord, 4 * jCoord));
 			noiseValue += 1;
-			float waterValue = 0.0f;
-
-			if (i < (float)width / 4) {
-				waterValue = 0.1f;
-			}
 
 			noiseValue /= HEIGHT_SCALING_VALUE;
-			waterValue /= HEIGHT_SCALING_VALUE;
 
-			// diffuse texture
-			baseDiffuseTexture[location + 0] = waterValue; // R = water height value
-			baseDiffuseTexture[location + 1] = noiseValue; // G = terrain height value
-			baseDiffuseTexture[location + 2] = 0.0f; // B = dissolved sediment value
-			baseDiffuseTexture[location + 3] = 1.0f; // A
+			// initial column data texture
+			CDTexture[location + 0] = 0.0f; // R = water height value
+			CDTexture[location + 1] = noiseValue; // G = terrain height value
+			CDTexture[location + 2] = 0.0f; // B = dissolved sediment value
+			CDTexture[location + 3] = 1.0f; // A
 
-			// specular texture
-			baseSpecularTexture[location + 0] = 0.0f; // R
-			baseSpecularTexture[location + 1] = 0.0f; // G
-			baseSpecularTexture[location + 2] = 0.0f; // B
-			baseSpecularTexture[location + 3] = 0.0f; // A
+			// initial flux texture
+			FTexture[location + 0] = 0.0f; // R = left flux value
+			FTexture[location + 1] = 0.0f; // G = right flux value
+			FTexture[location + 2] = 0.0f; // B = top flux value
+			FTexture[location + 3] = 0.0f; // A = bottom flux value
+
+			// initial velocity texture
+			VTexture[location + 0] = 0.0f; // R = velocity in x-direction
+			VTexture[location + 1] = 0.0f; // G = velocity in y-direction
+			VTexture[location + 2] = 0.0f; // B 
+			VTexture[location + 3] = 0.0f; // A 
 		}
 	}
 }
