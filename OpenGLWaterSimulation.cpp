@@ -58,9 +58,10 @@ vector<float> CDTexture(MESH_WIDTH * MESH_HEIGHT * 4);
 vector<float> FTexture(MESH_WIDTH * MESH_HEIGHT * 4);
 vector<float> VTexture(MESH_WIDTH * MESH_HEIGHT * 4);
 unsigned int CDTextureID, FTextureID, VTextureID;
+unsigned int tempCDTextureID;
 
-// frame buffer settings
-unsigned int CDFBO, FFBO, VFBO;
+// shader storage buffer settings
+unsigned int CDSSBO;
 
 // texture settings
 const GLenum TEXTURE_FORMAT = GL_RGBA;
@@ -114,6 +115,7 @@ int main()
 	// build and compile our shader zprogram
 	// ------------------------------------
 	Shader waterIncrementShader("waterIncrement.vs", "waterIncrement.fs");
+	Shader waterIncrementComputeShader("waterIncrement.ComputeShader");
 	Shader terrainRenderShader("terrainRender.vs", "terrainRender.fs");
 	Shader normalShader("displayNormals.vs", "displayNormals.fs", "displayNormals.gs");
 
@@ -147,36 +149,23 @@ int main()
 
 	glBindVertexArray(0);
 
-	// Create framebuffers for textures
-	// column data framebuffer
-	glGenFramebuffers(1, &CDFBO);
-	glBindFramebuffer(GL_FRAMEBUFFER, CDFBO);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, CDTextureID, 0);
+	// Create Shader Storage Buffer for column data
+	glGenBuffers(1, &CDSSBO);
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, CDSSBO);
+	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(CDTexture) * sizeof(float), &CDTexture[0], GL_DYNAMIC_DRAW);
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, CDSSBO);
+	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 
-	// check that framebuffer was successfully completed
-	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-		cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << endl;
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	// create texture for column data output
+	glGenTextures(1, &tempCDTextureID);
+	glBindTexture(GL_TEXTURE_2D, tempCDTextureID);
+	glTexImage2D(GL_TEXTURE_2D, 0, INTERNAL_TEXTURE_FORMAT, MESH_WIDTH, MESH_HEIGHT, 0, TEXTURE_FORMAT, GL_FLOAT, NULL);
 
-	// flux framebuffer
-	glGenFramebuffers(1, &FFBO);
-	glBindFramebuffer(GL_FRAMEBUFFER, FFBO);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, FTextureID, 0);
-
-	// check that framebuffer was successfully completed
-	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-		cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << endl;
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-	// velocity framebuffer
-	glGenFramebuffers(1, &VFBO);
-	glBindFramebuffer(GL_FRAMEBUFFER, VFBO);
-	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, VTextureID, 0);
-
-	// check that framebuffer was successfully completed
-	if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-		cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << endl;
-	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glBindImageTexture(0, tempCDTextureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, INTERNAL_TEXTURE_FORMAT);
 
 	// render loop
 	// -----------
@@ -193,17 +182,12 @@ int main()
 		processInput(window);
 
 		// First Pass: Water Increment Step
-		glBindFramebuffer(GL_FRAMEBUFFER, CDFBO);
-		waterIncrementShader.use();
-		waterIncrementShader.setFloat("CDTexture", CDTextureID);
-		glBindVertexArray(meshVAO);
-		glBindTexture(GL_TEXTURE_2D, CDTextureID);
-		glDrawElements(GL_TRIANGLES, meshIndices.size(), GL_UNSIGNED_INT, 0);
-		glBindVertexArray(0);
-
-		// Bind back to default frame buffer
-		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		waterIncrementComputeShader.use();
+		glDispatchCompute((GLuint)MESH_WIDTH, (GLuint)MESH_HEIGHT, 1);
 		
+		// Prevent from moving on until all compute shader calculations are done
+		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
 		// Final Pass: Terrain Render Step
 		// render
 		// ------
@@ -215,7 +199,7 @@ int main()
 		// set shader properties
 		terrainRenderShader.setVec3("viewPos", camera.Position);
 		terrainRenderShader.setFloat("size", MESH_TOTAL_SIZE);
-		terrainRenderShader.setFloat("terrainTexture", CDTextureID);
+		terrainRenderShader.setFloat("terrainTexture", tempCDTextureID);
 		terrainRenderShader.setFloat("terrainShininess", 1.0f);
 		terrainRenderShader.setFloat("waterShininess", 64.0f);
 		terrainRenderShader.setVec3("terrainColor", 0.7f, 0.6f, 0.35f);
@@ -246,7 +230,7 @@ int main()
 		terrainRenderShader.setMat4("model", model);
 		
 		// bind texture
-		glBindTexture(GL_TEXTURE_2D, CDTextureID);
+		glBindTexture(GL_TEXTURE_2D, tempCDTextureID);
 
 		// render mesh
 		glBindVertexArray(meshVAO);
@@ -471,7 +455,7 @@ void GenerateBaseTextures(unsigned int width, unsigned int height) {
 			CDTexture[location + 0] = 0.0f; // R = water height value
 			CDTexture[location + 1] = noiseValue; // G = terrain height value
 			CDTexture[location + 2] = 0.0f; // B = dissolved sediment value
-			CDTexture[location + 3] = 1.0f; // A
+			CDTexture[location + 3] = 0.0f; // A
 
 			// initial flux texture
 			FTexture[location + 0] = 0.0f; // R = left flux value

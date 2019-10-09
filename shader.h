@@ -16,7 +16,57 @@ public:
 	// the program ID;
 	unsigned int ID;
 
-	// constructor reads and builds the shader
+	// constructor reads and builds the shader program from given compute shader
+	Shader(const GLchar* computePath) {
+		// 1. Retrieve the vertex/fragment source code from filePath
+		string computeCode;
+		ifstream cShaderFile;
+
+		// ensure ifstream objects can thrown exceptions
+		cShaderFile.exceptions(ifstream::failbit | ifstream::badbit);
+
+		try {
+			// open files
+			cShaderFile.open(computePath);
+			stringstream cShaderStream;
+
+			// read file's buffer contents into streams
+			cShaderStream << cShaderFile.rdbuf();
+
+			// close file handlers
+			cShaderFile.close();
+
+			// convert stream into string
+			computeCode = cShaderStream.str();
+		}
+		catch (ifstream::failure e) {
+			cout << "ERROR::SHADER::FILE_NOT_SUCCESSFULLY_READ" << endl;
+		}
+
+		const char* cShaderCode = computeCode.c_str();
+
+		// 2. Compile shaders
+		unsigned int compute;
+
+		// vertex shader
+		compute = glCreateShader(GL_COMPUTE_SHADER);
+		glShaderSource(compute, 1, &cShaderCode, NULL);
+		glCompileShader(compute);
+		// print compile errors if any
+		checkCompileErrors(compute, "COMPUTE");
+
+		// shader program
+		ID = glCreateProgram();
+		glAttachShader(ID, compute);
+		glLinkProgram(ID);
+		// print linking errors if any
+		checkCompileErrors(ID, "PROGRAM");
+
+		// delete the shaders as they're linked into our program now and no longer necessary
+		glDeleteShader(compute);
+	}
+
+	// constructor reads and builds the shader program from given vertex, fragment, and geometry shaders
 	Shader(const GLchar* vertexPath, const GLchar* fragmentPath, const GLchar* geometryPath = nullptr) {
 		// 1. Retrieve the vertex/fragment source code from filePath
 		string vertexCode;

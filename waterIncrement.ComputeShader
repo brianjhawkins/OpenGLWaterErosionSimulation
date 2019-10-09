@@ -1,0 +1,21 @@
+#version 460 core
+layout(local_size_x = 1, local_size_y = 1) in;
+
+layout(rgba32f, binding = 2) uniform image2D CD_image; 
+
+layout(rgba32f, binding = 0) uniform image2D image_output;
+
+void main()
+{    
+    vec4 pixel = vec4(0.0f, 0.1f, 0.0f, 1.0f);
+
+	vec2 imageSize = imageSize(image_output);
+
+	ivec2 pixel_coords = ivec2(gl_GlobalInvocationID.xy);
+
+	if(pixel_coords.x < imageSize.x/4){
+		pixel = vec4(0.01f, 0.1f, 0.0f, 1.0f);
+	}
+
+	imageStore(image_output, pixel_coords, pixel);
+}
