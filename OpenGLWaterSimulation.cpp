@@ -149,12 +149,35 @@ int main()
 
 	glBindVertexArray(0);
 
-	// Create Shader Storage Buffer for column data
-	glGenBuffers(1, &CDSSBO);
-	glBindBuffer(GL_SHADER_STORAGE_BUFFER, CDSSBO);
-	glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(CDTexture) * sizeof(float), &CDTexture[0], GL_DYNAMIC_DRAW);
-	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 2, CDSSBO);
-	glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+	// create texture for initial column data
+	glGenTextures(1, &CDTextureID);
+	glBindTexture(GL_TEXTURE_2D, CDTextureID);
+	glTexImage2D(GL_TEXTURE_2D, 0, INTERNAL_TEXTURE_FORMAT, MESH_WIDTH, MESH_HEIGHT, 0, TEXTURE_FORMAT, GL_FLOAT, &CDTexture[0]);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+	// create texture for initial flux
+	glGenTextures(1, &FTextureID);
+	glBindTexture(GL_TEXTURE_2D, FTextureID);
+	glTexImage2D(GL_TEXTURE_2D, 0, INTERNAL_TEXTURE_FORMAT, MESH_WIDTH, MESH_HEIGHT, 0, TEXTURE_FORMAT, GL_FLOAT, &FTexture[0]);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+	// create texture for initial velocity
+	glGenTextures(1, &VTextureID);
+	glBindTexture(GL_TEXTURE_2D, VTextureID);
+	glTexImage2D(GL_TEXTURE_2D, 0, INTERNAL_TEXTURE_FORMAT, MESH_WIDTH, MESH_HEIGHT, 0, TEXTURE_FORMAT, GL_FLOAT, &VTexture[0]);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
 	// create texture for column data output
 	glGenTextures(1, &tempCDTextureID);
@@ -165,7 +188,6 @@ int main()
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	glBindImageTexture(0, tempCDTextureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, INTERNAL_TEXTURE_FORMAT);
 
 	// render loop
 	// -----------
@@ -183,6 +205,10 @@ int main()
 
 		// First Pass: Water Increment Step
 		waterIncrementComputeShader.use();
+		// Link CDTextureID to binding = 1 in water increment shader
+		glBindImageTexture(1, CDTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
+		// Link tempCDTextureID to the output (binding = 0) of the water increment shader
+		glBindImageTexture(0, tempCDTextureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, INTERNAL_TEXTURE_FORMAT);
 		glDispatchCompute((GLuint)MESH_WIDTH, (GLuint)MESH_HEIGHT, 1);
 		
 		// Prevent from moving on until all compute shader calculations are done
@@ -204,7 +230,9 @@ int main()
 		terrainRenderShader.setFloat("waterShininess", 64.0f);
 		terrainRenderShader.setVec3("terrainColor", 0.7f, 0.6f, 0.35f);
 		terrainRenderShader.setVec3("waterColor", 0.0f, 0.0f, 0.7f);
-		terrainRenderShader.setVec3("dirLight.direction", -0.0f, -1.0f, -0.0f);
+		//Todo: light is calculated in the wrong direction, need to figure out why this is happening
+		//		have switched the light direction for now for simple fix
+		terrainRenderShader.setVec3("dirLight.direction", -0.0f, 1.0f, -0.0f);
 		terrainRenderShader.setVec3("dirLight.ambient", 0.3f, 0.3f, 0.3f);
 		terrainRenderShader.setVec3("dirLight.diffuse", 0.6f, 0.6f, 0.6f);
 		terrainRenderShader.setVec3("dirLight.specular", 0.7f, 0.7f, 0.7f);
