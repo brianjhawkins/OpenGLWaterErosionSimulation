@@ -1,21 +1,41 @@
 #version 460 core
 layout(local_size_x = 1, local_size_y = 1) in;
 
+layout(rgba32f, binding = 0) uniform image2D image_output;
+
 layout(rgba32f, binding = 1) uniform image2D CD_image;
 
-layout(rgba32f, binding = 0) uniform image2D image_output;
+bool withinSourceRadius(int sourceX, int sourceY, int sourceRadius, int x, int y){
+	int differenceX = sourceX - x;
+	int differenceY = sourceY - y;
+
+	return (sourceRadius * sourceRadius) >= (differenceX * differenceX + differenceY * differenceY);
+}
 
 void main()
 {    
-	ivec2 pixel_coords = ivec2(gl_GlobalInvocationID.xy);
+	ivec2 pixelCoords = ivec2(gl_GlobalInvocationID.xy);
 
-	vec2 image_size = imageSize(image_output);
+	vec2 imageSize = imageSize(image_output);
     
-	vec4 pixel = imageLoad(CD_image, pixel_coords);	
+	vec4 columnData = imageLoad(CD_image, pixelCoords);	
 
-	if(pixel_coords.x < image_size.x / 5){
-		pixel += vec4(0.01f, 0.0f, 0.0f, 0.0f);
+	ivec2 source = ivec2(imageSize.x / 2, imageSize.y / 2);
+	int sourceRadius = int(imageSize.x / 10);
+
+	float newWaterHeight = 0;
+	float sourceIncrementValue = 0;
+
+	float timeStep = 0.002f;
+
+	// Increment constant
+	float Kis = 2;
+
+	if(withinSourceRadius(source.x, source.y, sourceRadius, pixelCoords.x, pixelCoords.y)){
+		sourceIncrementValue += Kis * timeStep;
 	}
 
-	imageStore(image_output, pixel_coords, pixel);
+	newWaterHeight = columnData.r + sourceIncrementValue;
+
+	imageStore(image_output, pixelCoords, vec4(newWaterHeight, columnData.g, columnData.b, columnData.a));
 }
