@@ -58,10 +58,7 @@ vector<float> CDTexture(MESH_WIDTH * MESH_HEIGHT * 4);
 vector<float> FTexture(MESH_WIDTH * MESH_HEIGHT * 4);
 vector<float> VTexture(MESH_WIDTH * MESH_HEIGHT * 4);
 unsigned int CDTextureID, FTextureID, VTextureID;
-unsigned int tempCDTextureID, tempFTextureID;
-
-// shader storage buffer settings
-unsigned int CDSSBO;
+unsigned int tempCDTextureID, tempFTextureID, tempVTextureID;
 
 // texture settings
 const GLenum TEXTURE_FORMAT = GL_RGBA;
@@ -69,6 +66,15 @@ const GLenum INTERNAL_TEXTURE_FORMAT = GL_RGBA32F;
 
 // debug settings
 bool drawPolygon = false;
+
+// Water Increment Source and Rain settings
+const unsigned int SOURCE_FLOW_CUTOFF_TIME = 15;
+const unsigned int RAIN_CUTOFF_TIME = 15;
+bool isSourceFlow = true;
+bool isRain = true;
+
+// Simulation Settings
+const float TIME_STEP = 0.002f;
 
 int main()
 {
@@ -117,6 +123,8 @@ int main()
 	Shader waterIncrementComputeShader("waterIncrement.ComputeShader");
 	Shader fluxUpdateComputeShader("fluxUpdate.ComputeShader");
 	Shader waterHeightUpdateComputeShader("waterHeightUpdate.ComputeShader");
+	Shader velocityFieldUpdateComputeShader("velocityFieldUpdate.ComputeShader");
+	Shader sedimentErosionAndDepositionComputeShader("sedimentErosionAndDeposition.ComputeShader");
 	Shader evaporationComputeShader("evaporation.ComputeShader");
 	Shader terrainRenderShader("terrainRender.vs", "terrainRender.fs");
 	Shader swapBuffersComputeShader("swapBuffers.ComputeShader");
@@ -201,6 +209,50 @@ int main()
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
+	// create texture for velocity output
+	glGenTextures(1, &tempVTextureID);
+	glBindTexture(GL_TEXTURE_2D, tempVTextureID);
+	glTexImage2D(GL_TEXTURE_2D, 0, INTERNAL_TEXTURE_FORMAT, MESH_WIDTH, MESH_HEIGHT, 0, TEXTURE_FORMAT, GL_FLOAT, NULL);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+	// Set static shader settings
+	// water increment shader static properties
+	waterIncrementComputeShader.use();
+	waterIncrementComputeShader.setFloat("timeStep", TIME_STEP);
+
+	// flux shader static properties
+	fluxUpdateComputeShader.use();
+	fluxUpdateComputeShader.setFloat("timeStep", TIME_STEP);
+
+	// water height shader static properties
+	waterHeightUpdateComputeShader.use();
+	waterHeightUpdateComputeShader.setFloat("timeStep", TIME_STEP);
+
+	// evaporation shader static properties
+	evaporationComputeShader.use();
+	evaporationComputeShader.setFloat("timeStep", TIME_STEP);
+
+	// terrain render shader static properties
+	terrainRenderShader.use();
+	terrainRenderShader.setFloat("size", MESH_TOTAL_SIZE);
+	terrainRenderShader.setFloat("terrainShininess", 1.0f);
+	terrainRenderShader.setFloat("waterShininess", 64.0f);
+	terrainRenderShader.setVec3("terrainColor", 0.9f, 0.85f, 0.65f);
+	terrainRenderShader.setVec3("terrainSpecularColor", 0.75f, 0.75f, 0.56f);
+	terrainRenderShader.setVec3("waterColor", 0.0f, 0.5f, 1.0f);
+	terrainRenderShader.setVec3("waterSpecularColor", 1.0f, 1.0f, 1.0f);
+	// set terrain render light properties
+	terrainRenderShader.setVec3("dirLight.direction", -0.0f, -1.0f, -0.0f);
+	terrainRenderShader.setVec3("dirLight.ambient", 0.2f, 0.2f, 0.2f);
+	terrainRenderShader.setVec3("dirLight.diffuse", 0.7f, 0.7f, 0.7f);
+	terrainRenderShader.setVec3("dirLight.specular", 0.8f, 0.8f, 0.8f);
+
+	float sourceFlowTime = 0;
+
 	// render loop
 	// -----------
 	while (!glfwWindowShouldClose(window))
@@ -210,6 +262,13 @@ int main()
 		float currentFrame = glfwGetTime();
 		deltaTime = currentFrame - lastFrame;
 		lastFrame = currentFrame;
+
+		if (sourceFlowTime < SOURCE_FLOW_CUTOFF_TIME) {
+			sourceFlowTime += deltaTime;
+		}
+		else {
+			isSourceFlow = false;
+		}
 
 		// input
 		// -----
@@ -222,6 +281,8 @@ int main()
 		// Link CDTextureID to binding = 1 in water increment shader
 		glBindImageTexture(1, CDTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
 		glDispatchCompute((GLuint)MESH_WIDTH, (GLuint)MESH_HEIGHT, 1);
+		// Set Water Increment Shader Properties		
+		waterIncrementComputeShader.setBool("isSourceFlow", isSourceFlow);
 		
 		// Prevent from moving on until all compute shader calculations are done
 		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
@@ -252,12 +313,42 @@ int main()
 		// Prevent from moving on until all compute shader calculations are done
 		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
-		// Fourth Pass: Evaporation Step
-		evaporationComputeShader.use();
-		// Link tempCDTextureID to the output (binding = 0) of the evaporation shader
-		glBindImageTexture(0, tempCDTextureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, INTERNAL_TEXTURE_FORMAT);
-		// Link CDTextureID to binding = 1 in the evaporation shader
+		// Fourth Pass: Velocity Field Update Step
+		velocityFieldUpdateComputeShader.use();
+		// Link tempVTextureID to binding = 0 in water height update shader
+		glBindImageTexture(0, tempVTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
+		// Link CDTextureID to binding = 1 in water height update shader
 		glBindImageTexture(1, CDTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
+		// Link tempCDTextureID to binding = 2 in water height update shader
+		glBindImageTexture(2, tempCDTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
+		// Link tempFTextureID to binding = 3 in water height update shader
+		glBindImageTexture(3, tempFTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
+		// Link VTextureID to binding = 4 in water height update shader
+		glBindImageTexture(4, VTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
+		glDispatchCompute((GLuint)MESH_WIDTH, (GLuint)MESH_HEIGHT, 1);
+
+		// Prevent from moving on until all compute shader calculations are done
+		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+		// Fifth Pass: Sediment Erosion/Deposition Step
+		sedimentErosionAndDepositionComputeShader.use();
+		// Link tempCDTextureID to binding = 0 in water height update shader
+		glBindImageTexture(0, tempCDTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
+		// Link CDTextureID to binding = 1 in water height update shader
+		glBindImageTexture(1, CDTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
+		// Link tempVTextureID to binding = 2 in water height update shader
+		glBindImageTexture(2, tempVTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
+		glDispatchCompute((GLuint)MESH_WIDTH, (GLuint)MESH_HEIGHT, 1);
+
+		// Prevent from moving on until all compute shader calculations are done
+		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+		// Fifth Pass: Evaporation Step
+		evaporationComputeShader.use();
+		// Link CDTextureID to the output (binding = 0) of the evaporation shader
+		glBindImageTexture(0, CDTextureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, INTERNAL_TEXTURE_FORMAT);
+		// Link tempCDTextureID to binding = 1 in the evaporation shader
+		glBindImageTexture(1, tempCDTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
 		glDispatchCompute((GLuint)MESH_WIDTH, (GLuint)MESH_HEIGHT, 1);
 
 		// Prevent from moving on until all compute shader calculations are done
@@ -273,20 +364,7 @@ int main()
 		terrainRenderShader.use();
 		// set shader properties
 		terrainRenderShader.setVec3("viewPos", camera.Position);
-		terrainRenderShader.setFloat("size", MESH_TOTAL_SIZE);
-		terrainRenderShader.setFloat("terrainTexture", tempCDTextureID);
-		terrainRenderShader.setFloat("terrainShininess", 64.0f);
-		terrainRenderShader.setFloat("waterShininess", 64.0f);
-		terrainRenderShader.setVec3("terrainColor", 0.9f, 0.85f, 0.65f);
-		terrainRenderShader.setVec3("terrainSpecularColor", 0.75f, 0.75f, 0.56f);
-		terrainRenderShader.setVec3("waterColor", 0.0f, 0.5f, 1.0f);
-		terrainRenderShader.setVec3("waterSpecularColor", 1.0f, 1.0f, 1.0f);
-		//Todo: light is calculated in the wrong direction, need to figure out why this is happening
-		//		have switched the light direction for now for simple fix
-		terrainRenderShader.setVec3("dirLight.direction", -0.0f, -1.0f, -0.0f);
-		terrainRenderShader.setVec3("dirLight.ambient", 0.2f, 0.2f, 0.2f);
-		terrainRenderShader.setVec3("dirLight.diffuse", 0.4f, 0.4f, 0.4f);
-		terrainRenderShader.setVec3("dirLight.specular", 0.8f, 0.8f, 0.8f);
+		terrainRenderShader.setFloat("terrainTexture", CDTextureID);		
 
 		// pass projection matrix to shader (note that in this case it could change every frame)
 		glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
@@ -309,12 +387,12 @@ int main()
 		glBindVertexArray(0);
 
 		// Swap info in tempCDTexture to CDTexture
-		swapBuffersComputeShader.use();
+		//swapBuffersComputeShader.use();
 		// Link CDTextureID to the output (binding = 0) of the swap buffers shader
-		glBindImageTexture(0, CDTextureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, INTERNAL_TEXTURE_FORMAT);
+		//glBindImageTexture(0, CDTextureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, INTERNAL_TEXTURE_FORMAT);
 		// Link tempCDTextureID to binding = 1 in the swap buffers shader
-		glBindImageTexture(1, tempCDTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
-		glDispatchCompute((GLuint)MESH_WIDTH, (GLuint)MESH_HEIGHT, 1);
+		//glBindImageTexture(1, tempCDTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
+		//glDispatchCompute((GLuint)MESH_WIDTH, (GLuint)MESH_HEIGHT, 1);
 
 		// Prevent from moving on until all compute shader calculations are done
 		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
@@ -325,6 +403,17 @@ int main()
 		glBindImageTexture(0, FTextureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, INTERNAL_TEXTURE_FORMAT);
 		// Link tempFTextureID to binding = 1 in the swap buffers shader
 		glBindImageTexture(1, tempFTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
+		glDispatchCompute((GLuint)MESH_WIDTH, (GLuint)MESH_HEIGHT, 1);
+
+		// Prevent from moving on until all compute shader calculations are done
+		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+		// Swap info in tempVTexture to VTexture
+		swapBuffersComputeShader.use();
+		// Link VTextureID to the output (binding = 0) of the swap buffers shader
+		glBindImageTexture(0, VTextureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, INTERNAL_TEXTURE_FORMAT);
+		// Link tempVTextureID to binding = 1 in the swap buffers shader
+		glBindImageTexture(1, tempVTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
 		glDispatchCompute((GLuint)MESH_WIDTH, (GLuint)MESH_HEIGHT, 1);
 
 		// Prevent from moving on until all compute shader calculations are done

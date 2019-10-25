@@ -5,6 +5,8 @@ layout(rgba32f, binding = 0) uniform image2D image_output;
 
 layout(rgba32f, binding = 1) uniform image2D CD_image;
 
+uniform float timeStep;
+
 void main()
 {    
 	ivec2 pixelCoords = ivec2(gl_GlobalInvocationID.xy);
@@ -14,8 +16,6 @@ void main()
 	vec4 columnData = imageLoad(CD_image, pixelCoords);
 
 	float newWaterHeight;
-
-	float timeStep = 0.002f;
 
 	// Evaporation constant
 	float Ke = 3;

@@ -41,7 +41,7 @@ void main()
 vec3 CalcDirLight(DirLight light, vec3 normal, vec3 viewDir){
 	vec3 lightDir = normalize(-light.direction);
 	vec4 terrainValue = texture(terrainTexture, TexCoords);
-	vec3 renderColor;
+	vec3 renderColor = vec3(1.0f, 0.0f, 0.0f);
 	vec3 specularColor;
 	float shininess;
 	
@@ -56,8 +56,6 @@ vec3 CalcDirLight(DirLight light, vec3 normal, vec3 viewDir){
 		shininess = terrainShininess;
 	}
 
-	normalize(renderColor);
-
 	// Diffuse Shading
 	float diff = max(dot(normal, lightDir), 0.0f);
 
@@ -70,5 +68,5 @@ vec3 CalcDirLight(DirLight light, vec3 normal, vec3 viewDir){
 	vec3 diffuse = light.diffuse * diff * renderColor;
 	vec3 specular = light.specular * spec * specularColor;
 
-	return normalize(ambient + diffuse + specular);
+	return ambient + diffuse + specular;
 }

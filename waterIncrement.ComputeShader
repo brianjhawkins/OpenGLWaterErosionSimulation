@@ -5,6 +5,9 @@ layout(rgba32f, binding = 0) uniform image2D image_output;
 
 layout(rgba32f, binding = 1) uniform image2D CD_image;
 
+uniform bool isSourceFlow;
+uniform float timeStep;
+
 bool withinSourceRadius(int sourceX, int sourceY, int sourceRadius, int x, int y){
 	int differenceX = sourceX - x;
 	int differenceY = sourceY - y;
@@ -21,18 +24,18 @@ void main()
 	vec4 columnData = imageLoad(CD_image, pixelCoords);	
 
 	ivec2 source = ivec2(imageSize.x / 2, imageSize.y / 2);
-	int sourceRadius = int(imageSize.x / 20);
+	int sourceRadius = int(imageSize.x / 50);
 
 	float newWaterHeight = 0;
 	float sourceIncrementValue = 0;
 
-	float timeStep = 0.002f;
-
 	// Increment constant
 	float Kis = 1;
 
-	if(withinSourceRadius(source.x, source.y, sourceRadius, pixelCoords.x, pixelCoords.y)){
-		sourceIncrementValue += Kis * timeStep;
+	if(isSourceFlow){
+		if(withinSourceRadius(source.x, source.y, sourceRadius, pixelCoords.x, pixelCoords.y)){
+			sourceIncrementValue += Kis * timeStep;
+		}
 	}
 
 	newWaterHeight = columnData.r + sourceIncrementValue;

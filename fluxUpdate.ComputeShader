@@ -7,6 +7,8 @@ layout(rgba32f, binding = 1) uniform image2D CD_image;
 
 layout(rgba32f, binding = 2) uniform image2D F_image;
 
+uniform float timeStep;
+
 float heightDifference(vec4 center, vec4 adjacent){
 	return (center.r + center.g - adjacent.r - adjacent.g);
 }
@@ -37,7 +39,6 @@ void main()
 	float l = 1 / imageSize.x;
 	float A = l * l * 20;
 	float g = 9.8f * 0.7f;
-	float timeStep = 0.002f;
 	
 	// Left Flux
 	if(pixelCoords.x == 0){

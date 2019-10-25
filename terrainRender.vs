@@ -18,26 +18,22 @@ void main()
 	vec4 terrainTextureValue = texture(terrainTexture, aTexCoords);
 	
 	vec3 newPosition = aPos;
-	float newY = (terrainTextureValue.x + terrainTextureValue.y) * size;
+	float newY = (terrainTextureValue.r + terrainTextureValue.g) * size;
 	newPosition.y = newY;
 	
 	vec3 newNormal;
 	vec2 textureSize = textureSize(terrainTexture, 0);
 	vec2 texelSize = vec2(1.0f / textureSize.x, 1.0f / textureSize.y);
-	vec2 left = textureOffset(terrainTexture, aTexCoords, ivec2(-1, 0)).xy;
-	vec2 right = textureOffset(terrainTexture, aTexCoords, ivec2(1, 0)).xy;
-	vec2 up = textureOffset(terrainTexture, aTexCoords, ivec2(0, 1)).xy;
-	vec2 down = textureOffset(terrainTexture, aTexCoords, ivec2(0, -1)).xy;
-	float leftHeight = (left.x + left.y) * size;
-	float rightHeight = (right.x + right.y) * size;
-	float upHeight = (up.x + up.y) * size;
-	float downHeight = (down.x + down.y) * size;
-	vec3 vLeft = normalize(vec3(-texelSize.x, leftHeight - newY, 0.0f));
-	vec3 vRight = normalize(vec3(texelSize.x, rightHeight - newY, 0.0f));
-	vec3 vUp = normalize(vec3(0.0f, upHeight - newY, texelSize.y));
-	vec3 vDown = normalize(vec3(0.0f, downHeight - newY, -texelSize.y));
-	vec3 averageNormal = (cross(vUp, vRight) + cross(vRight, vDown) + cross(vDown, vLeft) + cross(vLeft, vUp)) / -4;
-	newNormal = normalize(averageNormal);
+	vec2 left = textureOffset(terrainTexture, aTexCoords, ivec2(-1, 0)).rg;
+	vec2 right = textureOffset(terrainTexture, aTexCoords, ivec2(1, 0)).rg;
+	vec2 top = textureOffset(terrainTexture, aTexCoords, ivec2(0, 1)).rg;
+	vec2 bottom = textureOffset(terrainTexture, aTexCoords, ivec2(0, -1)).rg;
+	float leftHeight = (left.r + left.g) * size;
+	float rightHeight = (right.r + right.g) * size;
+	float topHeight = (top.r + top.g) * size;
+	float bottomHeight = (bottom.r + bottom.g) * size;
+	newNormal = vec3(leftHeight - rightHeight, 2 * texelSize.x, bottomHeight - topHeight);
+	newNormal = normalize(newNormal);
 
     gl_Position = projection * view * model * vec4(newPosition, 1.0);
 	Normal = mat3(transpose(inverse(model))) * newNormal;
