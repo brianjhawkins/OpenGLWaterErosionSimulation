@@ -21,7 +21,7 @@ void main()
 	vec4 columnData = imageLoad(CD_image, pixelCoords);	
 
 	ivec2 source = ivec2(imageSize.x / 2, imageSize.y / 2);
-	int sourceRadius = int(imageSize.x / 10);
+	int sourceRadius = int(imageSize.x / 20);
 
 	float newWaterHeight = 0;
 	float sourceIncrementValue = 0;
@@ -29,7 +29,7 @@ void main()
 	float timeStep = 0.002f;
 
 	// Increment constant
-	float Kis = 2;
+	float Kis = 1;
 
 	if(withinSourceRadius(source.x, source.y, sourceRadius, pixelCoords.x, pixelCoords.y)){
 		sourceIncrementValue += Kis * timeStep;

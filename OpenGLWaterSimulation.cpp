@@ -120,7 +120,6 @@ int main()
 	Shader evaporationComputeShader("evaporation.ComputeShader");
 	Shader terrainRenderShader("terrainRender.vs", "terrainRender.fs");
 	Shader swapBuffersComputeShader("swapBuffers.ComputeShader");
-	Shader normalShader("displayNormals.vs", "displayNormals.fs", "displayNormals.gs");
 
 	// set up vertex data (and buffer(s)) and configure vertex attributes
 	// ------------------------------------------------------------------
@@ -276,17 +275,18 @@ int main()
 		terrainRenderShader.setVec3("viewPos", camera.Position);
 		terrainRenderShader.setFloat("size", MESH_TOTAL_SIZE);
 		terrainRenderShader.setFloat("terrainTexture", tempCDTextureID);
-		terrainRenderShader.setFloat("terrainShininess", 1.0f);
+		terrainRenderShader.setFloat("terrainShininess", 64.0f);
 		terrainRenderShader.setFloat("waterShininess", 64.0f);
-		terrainRenderShader.setVec3("terrainColor", 0.7f, 0.6f, 0.35f);
-		terrainRenderShader.setVec3("waterColor", 0.0f, 0.0f, 0.7f);
+		terrainRenderShader.setVec3("terrainColor", 0.9f, 0.85f, 0.65f);
+		terrainRenderShader.setVec3("terrainSpecularColor", 0.75f, 0.75f, 0.56f);
+		terrainRenderShader.setVec3("waterColor", 0.0f, 0.5f, 1.0f);
+		terrainRenderShader.setVec3("waterSpecularColor", 1.0f, 1.0f, 1.0f);
 		//Todo: light is calculated in the wrong direction, need to figure out why this is happening
 		//		have switched the light direction for now for simple fix
 		terrainRenderShader.setVec3("dirLight.direction", -0.0f, -1.0f, -0.0f);
-		terrainRenderShader.setVec3("dirLight.ambient", 0.3f, 0.3f, 0.3f);
-		terrainRenderShader.setVec3("dirLight.diffuse", 0.6f, 0.6f, 0.6f);
-		terrainRenderShader.setVec3("dirLight.specular", 0.7f, 0.7f, 0.7f);
-		terrainRenderShader.setVec3("dirLight.lightColor", 1.0f, 1.0f, 1.0f);
+		terrainRenderShader.setVec3("dirLight.ambient", 0.2f, 0.2f, 0.2f);
+		terrainRenderShader.setVec3("dirLight.diffuse", 0.4f, 0.4f, 0.4f);
+		terrainRenderShader.setVec3("dirLight.specular", 0.8f, 0.8f, 0.8f);
 
 		// pass projection matrix to shader (note that in this case it could change every frame)
 		glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
@@ -295,13 +295,6 @@ int main()
 		// camera/view transformation
 		glm::mat4 view = camera.GetViewMatrix();
 		terrainRenderShader.setMat4("view", view);
-
-		// world transformation
-		//glm::mat4 model = glm::mat4(1.0f);
-		//model = glm::translate(model, glm::vec3(0.0f, -1.75f, 0.0f));
-		//model = glm::scale(model, glm::vec3(0.2f, 0.2f, 0.2f));
-		//ourShader.setMat4("model", model);
-		//ourModel.Draw(ourShader);
 		
 		glm::mat4 model = glm::mat4(1.0f);
 		model = glm::translate(model, glm::vec3(-(float)MESH_TOTAL_SIZE / (float)2, 0.0f, (float)MESH_TOTAL_SIZE / (float)2));
@@ -314,13 +307,6 @@ int main()
 		glBindVertexArray(meshVAO);
 		glDrawElements(GL_TRIANGLES, meshIndices.size(), GL_UNSIGNED_INT, 0);
 		glBindVertexArray(0);
-
-		// display normals with normalShader
-		//normalShader.use();
-		//normalShader.setMat4("projection", projection);
-		//normalShader.setMat4("view", view);
-		//normalShader.setMat4("model", model);
-		//baseMesh.Draw(normalShader);
 
 		// Swap info in tempCDTexture to CDTexture
 		swapBuffersComputeShader.use();
