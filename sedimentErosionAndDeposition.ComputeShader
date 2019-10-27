@@ -19,11 +19,11 @@ void main()
 	vec4 centerVelocity = imageLoad(V_image, pixelCoords);
 
 	// Sediment Capacity constant
-	float Kc = 0.003f;
+	float Kc = 0.005f;
 	// Dissolving constant
-	float Ks = 0.001f;
+	float Ks = 0.003f;
 	// Deposition constant
-	float Kd = 0.005f;
+	float Kd = 0.003f;
 
 	float newTerrainHeight;
 	float newSedimentValue;

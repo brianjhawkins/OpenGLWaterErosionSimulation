@@ -1,0 +1,64 @@
+#version 460 core
+layout(local_size_x = 1, local_size_y = 1) in;
+
+layout(rgba32f, binding = 0) uniform image2D image_output;
+
+layout(rgba32f, binding = 1) uniform image2D CD_image;
+
+layout(rgba32f, binding = 2) uniform image2D V_image;
+
+uniform float timeStep;
+
+void main()
+{    
+	ivec2 pixelCoords = ivec2(gl_GlobalInvocationID.xy);
+
+	vec2 imageSize = imageSize(image_output);
+    ivec2 deltaX = ivec2(1, 0);
+	ivec2 deltaY = ivec2(0, 1);
+
+	vec4 centerColumn = imageLoad(CD_image, pixelCoords);
+	vec4 centerVelocity = imageLoad(V_image, pixelCoords);
+
+	float newSedimentValue;
+
+	// Use backtracking to calculate advection values
+	// Determine where the sediment that should be in this point was last timestep
+	float xCoordinate = (pixelCoords.x / imageSize.x) - (centerVelocity.x * timeStep);
+	float yCoordinate = (pixelCoords.y / imageSize.y) - (centerVelocity.y * timeStep);
+
+	float width = imageSize.x;
+	float height = imageSize.y;
+
+	xCoordinate *= width;
+	yCoordinate *= height;
+
+	// Find the nearest x and y values that are points on the texture
+	float nearestPreviousX = floor(xCoordinate);
+	float nearestPreviousY = floor(yCoordinate);
+
+	// Determine if the coordinate found in teh backtracking step is on the grid or not
+	// If it is on the grid, simply find its sediment value and return it
+	if(xCoordinate == nearestPreviousX && yCoordinate == nearestPreviousY){
+		newSedimentValue = imageLoad(CD_image, ivec2(xCoordinate, yCoordinate)).b;
+	}
+	// If it is not on the grid, use bilinear interpolation between the 4 nearest points on the grid
+	else{
+		ivec2 bottomLeft = ivec2(nearestPreviousX, nearestPreviousY);
+		ivec2 bottomRight = ivec2(nearestPreviousX + 1, nearestPreviousY);
+		ivec2 topLeft = ivec2(nearestPreviousX, nearestPreviousY + 1);
+		ivec2 topRight = ivec2(nearestPreviousX + 1, nearestPreviousY + 1);
+
+		float bottomLeftSediment = imageLoad(CD_image, bottomLeft).b;
+		float bottomRightSediment = imageLoad(CD_image, bottomRight).b;
+		float topLeftSediment = imageLoad(CD_image, topLeft).b;
+		float topRightSediment = imageLoad(CD_image, topRight).b;
+
+		float topXInterpolation = ((topRight.x - xCoordinate) * topLeftSediment) + ((xCoordinate - topLeft.x) * topRightSediment);
+		float bottomXInterpolation = ((bottomRight.x - xCoordinate) * bottomLeftSediment) + ((xCoordinate - bottomLeft.x) * bottomRightSediment);
+
+		newSedimentValue = ((topLeft.y - yCoordinate) * bottomXInterpolation) + ((yCoordinate - bottomLeft.y) * topXInterpolation);
+	}
+
+	imageStore(image_output, pixelCoords, vec4(centerColumn.r, centerColumn.g, newSedimentValue, centerColumn.a));
+}
