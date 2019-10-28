@@ -224,6 +224,16 @@ int main()
 	// water increment shader static properties
 	waterIncrementComputeShader.use();
 	waterIncrementComputeShader.setFloat("timeStep", TIME_STEP);
+	// set source values
+	waterIncrementComputeShader.setInt("currentNumberSources", 2);
+	// Source 1
+	waterIncrementComputeShader.setIVec2("sources[0].position", 0.25f * MESH_WIDTH, 0.25f * MESH_HEIGHT);
+	waterIncrementComputeShader.setInt("sources[0].radius", MESH_WIDTH / 20);
+	waterIncrementComputeShader.setFloat("sources[0].Kis", 0.5f);
+	// Source 2
+	waterIncrementComputeShader.setIVec2("sources[1].position", 0.75f * MESH_WIDTH, 0.75f * MESH_HEIGHT);
+	waterIncrementComputeShader.setInt("sources[1].radius", MESH_WIDTH / 40);
+	waterIncrementComputeShader.setFloat("sources[1].Kis", 0.75f);
 
 	// flux shader static properties
 	fluxUpdateComputeShader.use();

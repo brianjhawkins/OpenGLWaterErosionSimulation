@@ -5,7 +5,19 @@ layout(rgba32f, binding = 0) uniform image2D image_output;
 
 layout(rgba32f, binding = 1) uniform image2D CD_image;
 
+struct Source{
+	ivec2 position;
+	int radius;
+
+	// Increment Constant
+	float Kis;
+};
+
+#define MAX_NUMBER_SOURCES 4
+
 uniform bool isSourceFlow;
+uniform int currentNumberSources;
+uniform Source sources[MAX_NUMBER_SOURCES];
 uniform float timeStep;
 
 bool withinSourceRadius(int sourceX, int sourceY, int sourceRadius, int x, int y){
@@ -21,21 +33,17 @@ void main()
 
 	vec2 imageSize = imageSize(image_output);
     
-	vec4 columnData = imageLoad(CD_image, pixelCoords);	
-
-	ivec2 source = ivec2(imageSize.x / 2, imageSize.y / 2);
-	int sourceRadius = int(imageSize.x / 10);
+	vec4 columnData = imageLoad(CD_image, pixelCoords);
 
 	float newWaterHeight = 0;
 	float sourceIncrementValue = 0;
 
-	// Increment constant
-	float Kis = 1;
-
 	if(isSourceFlow){
-		if(withinSourceRadius(source.x, source.y, sourceRadius, pixelCoords.x, pixelCoords.y)){
-			sourceIncrementValue += Kis * timeStep;
-		}
+		for(int i = 0; i < currentNumberSources; i++){
+			if(withinSourceRadius(sources[i].position.x, sources[i].position.y, sources[i].radius, pixelCoords.x, pixelCoords.y)){
+				sourceIncrementValue += sources[i].Kis * timeStep;
+			}
+		}		
 	}
 
 	newWaterHeight = columnData.r + sourceIncrementValue;
