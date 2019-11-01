@@ -7,6 +7,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/noise.hpp>
+#include <glm/gtc/random.hpp>
 #include <glm/gtx/normal.hpp>
 
 #include "shader.h"
@@ -69,9 +70,11 @@ bool drawPolygon = false;
 
 // Water Increment Source and Rain settings
 const unsigned int SOURCE_FLOW_CUTOFF_TIME = 25;
-const unsigned int RAIN_CUTOFF_TIME = 15;
+const unsigned int RAIN_CUTOFF_TIME = 25;
 bool isSourceFlow = true;
 bool isRain = true;
+int numberOfRaindrops = 1;
+int rainRadius;
 
 // Simulation Settings
 const float TIME_STEP = 0.002f;
@@ -234,6 +237,8 @@ int main()
 	waterIncrementComputeShader.setIVec2("sources[1].position", 0.75f * MESH_WIDTH, 0.75f * MESH_HEIGHT);
 	waterIncrementComputeShader.setInt("sources[1].radius", MESH_WIDTH / 40);
 	waterIncrementComputeShader.setFloat("sources[1].Kis", 0.75f);
+	// set rain value
+	waterIncrementComputeShader.setInt("currentNumberRaindrops", numberOfRaindrops);
 
 	// flux shader static properties
 	fluxUpdateComputeShader.use();
@@ -267,6 +272,7 @@ int main()
 	terrainRenderShader.setVec3("dirLight.specular", 1.0f, 1.0f, 1.0f);
 
 	float sourceFlowTime = 0;
+	float rainFallTime = 0;
 
 	// render loop
 	// -----------
@@ -285,6 +291,13 @@ int main()
 			isSourceFlow = false;
 		}
 
+		if (rainFallTime < RAIN_CUTOFF_TIME) {
+			rainFallTime += deltaTime;
+		}
+		else {
+			isRain = false;
+		}
+
 		// input
 		// -----
 		processInput(window);
@@ -296,8 +309,31 @@ int main()
 		// Link CDTextureID to binding = 1 in water increment shader
 		glBindImageTexture(1, CDTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
 		glDispatchCompute((GLuint)MESH_WIDTH, (GLuint)MESH_HEIGHT, 1);
-		// Set Water Increment Shader Properties		
+		// Set Water Increment Shader Properties
+		// Set source flow boolean
 		waterIncrementComputeShader.setBool("isSourceFlow", isSourceFlow);
+		// Set rain fall boolean
+		waterIncrementComputeShader.setBool("isRain", isRain);
+		if (isRain) {
+			for (int i = 0; i < numberOfRaindrops; i++) {
+				string raindrop = "raindrops[";
+				raindrop += std::to_string(i);
+				string position = "].position";
+				string radius = "].radius";
+				string increment = "].Kir";
+
+				float Kir = glm::linearRand(3, 5);
+
+				rainRadius = MESH_WIDTH / 100;
+
+				int x = glm::linearRand(rainRadius, (int)MESH_WIDTH - rainRadius);
+				int y = glm::linearRand(rainRadius, (int)MESH_HEIGHT - rainRadius);
+
+				waterIncrementComputeShader.setIVec2(raindrop + position, x, y);
+				waterIncrementComputeShader.setInt(raindrop + radius, rainRadius);
+				waterIncrementComputeShader.setFloat(raindrop + increment, Kir);
+			}
+		}
 		
 		// Prevent from moving on until all compute shader calculations are done
 		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);

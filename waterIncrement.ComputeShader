@@ -13,11 +13,25 @@ struct Source{
 	float Kis;
 };
 
+struct Raindrop{
+	ivec2 position;
+	int radius;
+
+	// Increment Constant
+	float Kir;
+};
+
 #define MAX_NUMBER_SOURCES 4
+#define MAX_NUMBER_RAINDROPS 4
 
 uniform bool isSourceFlow;
 uniform int currentNumberSources;
 uniform Source sources[MAX_NUMBER_SOURCES];
+
+uniform bool isRain;
+uniform int currentNumberRaindrops;
+uniform Raindrop raindrops[MAX_NUMBER_RAINDROPS];
+
 uniform float timeStep;
 
 bool withinSourceRadius(int sourceX, int sourceY, int sourceRadius, int x, int y){
@@ -37,7 +51,9 @@ void main()
 
 	float newWaterHeight = 0;
 	float sourceIncrementValue = 0;
+	float rainIncrementValue = 0;
 
+	// Sources
 	if(isSourceFlow){
 		for(int i = 0; i < currentNumberSources; i++){
 			if(withinSourceRadius(sources[i].position.x, sources[i].position.y, sources[i].radius, pixelCoords.x, pixelCoords.y)){
@@ -46,7 +62,16 @@ void main()
 		}		
 	}
 
-	newWaterHeight = columnData.r + sourceIncrementValue;
+	// Rain
+	if(isRain){
+		for(int i = 0; i < currentNumberRaindrops; i++){
+			if(withinSourceRadius(raindrops[i].position.x, raindrops[i].position.y, raindrops[i].radius, pixelCoords.x, pixelCoords.y)){
+				rainIncrementValue += raindrops[i].Kir * timeStep;
+			}
+		}
+	}
+
+	newWaterHeight = columnData.r + sourceIncrementValue + rainIncrementValue;
 
 	imageStore(image_output, pixelCoords, vec4(newWaterHeight, columnData.g, columnData.b, columnData.a));
 }
