@@ -10,7 +10,7 @@ layout(rgba32f, binding = 2) uniform image2D F_image;
 uniform float timeStep;
 
 float heightDifference(vec4 center, vec4 adjacent){
-	return (center.r + center.g - adjacent.r - adjacent.g);
+	return max(center.g, adjacent.r + adjacent.g) - (center.r + center.g);
 }
 
 void main()
@@ -38,14 +38,15 @@ void main()
 
 	float l = 1 / imageSize.x;
 	float A = l * l * 20;
-	float g = 9.8f * 0.7f;
+	float g = -9.8f;
+	float Kf = 0.99f;
 	
 	// Left Flux
 	if(pixelCoords.x == 0){
 		leftFlux = 0;
 	}
 	else{
-		leftFlux = max(0, centerFlux.r + (timeStep * A * (g * heightDifference(centerColumn, leftColumn) / l)));
+		leftFlux = max(0, Kf * centerFlux.r + (timeStep * A * (g * heightDifference(centerColumn, leftColumn) / l)));
 	}
 
 	// Right Flux
@@ -53,7 +54,7 @@ void main()
 		rightFlux = 0;
 	}
 	else{
-		rightFlux = max(0, centerFlux.g + (timeStep * A * (g * heightDifference(centerColumn, rightColumn) / l)));
+		rightFlux = max(0, Kf * centerFlux.g + (timeStep * A * (g * heightDifference(centerColumn, rightColumn) / l)));
 	}
 
 	// Top Flux
@@ -61,7 +62,7 @@ void main()
 		topFlux = 0;
 	}
 	else{
-		topFlux = max(0, centerFlux.b + (timeStep * A * (g * heightDifference(centerColumn, topColumn) / l)));
+		topFlux = max(0, Kf * centerFlux.b + (timeStep * A * (g * heightDifference(centerColumn, topColumn) / l)));
 	}
 
 	// Bottom Flux
@@ -69,7 +70,7 @@ void main()
 		bottomFlux = 0;
 	}
 	else{
-		bottomFlux = max(0, centerFlux.a + (timeStep * A * (g * heightDifference(centerColumn, bottomColumn) / l)));
+		bottomFlux = max(0, Kf * centerFlux.a + (timeStep * A * (g * heightDifference(centerColumn, bottomColumn) / l)));
 	}
 
 	// Scaling Factor K

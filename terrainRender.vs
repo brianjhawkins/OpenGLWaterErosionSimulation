@@ -9,9 +9,19 @@ uniform mat4 projection;
 uniform sampler2D terrainTexture;
 uniform float size;
 
+uniform vec3 terrainColor;
+uniform vec3 waterColor;
+uniform vec3 terrainSpecularColor;
+uniform vec3 waterSpecularColor;
+uniform float terrainShininess;
+uniform float waterShininess;
+
 out vec3 Normal;
 out vec3 FragPos;
 out vec2 TexCoords;
+out vec3 VertexColor;
+out vec3 VertexSpecularColor;
+out float VertexShininess;
 
 void main()
 {
@@ -39,4 +49,14 @@ void main()
 	Normal = mat3(transpose(inverse(model))) * newNormal;
 	FragPos = vec3(model * vec4(newPosition, 1.0));
 	TexCoords = aTexCoords;
+
+	if(terrainTextureValue.r > 0.0f){
+		VertexColor = mix(waterColor, terrainColor, clamp(0.8f - terrainTextureValue.r * 30, 0.0f, 1.0f));
+		VertexSpecularColor = waterSpecularColor;
+		VertexShininess = waterShininess;
+	} else {
+		VertexColor = terrainColor;
+		VertexSpecularColor = terrainSpecularColor;
+		VertexShininess = terrainShininess;
+	}
 }

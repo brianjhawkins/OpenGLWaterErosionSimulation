@@ -30,14 +30,8 @@ void GenerateMeshTextures(unsigned int width, unsigned int height);
 void GenerateBaseTextures(unsigned int width, unsigned int height);
 
 // window settings
-const unsigned int SCR_WIDTH = 1280;
-const unsigned int SCR_HEIGHT = 720;
-
-// camera
-Camera camera(glm::vec3(0.0f, 15.0f, 0.0f));
-float lastX = SCR_WIDTH / 2.0f;
-float lastY = SCR_HEIGHT / 2.0f;
-bool firstMouse = true;
+const unsigned int SCR_WIDTH = 1980;
+const unsigned int SCR_HEIGHT = 1018;
 
 // timing
 float deltaTime = 0.0f;	// time between current frame and last frame
@@ -52,6 +46,14 @@ const unsigned int MESH_HEIGHT = MESH_WIDTH;
 const unsigned int MESH_TOTAL_SIZE = 10;
 const float MESH_SCALE = (float)MESH_TOTAL_SIZE / (float)MESH_WIDTH;
 unsigned int meshVAO, meshVBO, meshEBO;
+vector<unsigned int> meshIndices;
+vector<float> meshVertices;
+
+// camera
+Camera camera(glm::vec3(0.0f, 1.5f * MESH_TOTAL_SIZE, 0.0f));
+float lastX = SCR_WIDTH / 2.0f;
+float lastY = SCR_HEIGHT / 2.0f;
+bool firstMouse = true;
 
 // texture settings
 const float HEIGHT_SCALING_VALUE = 5.0f;
@@ -69,15 +71,19 @@ const GLenum INTERNAL_TEXTURE_FORMAT = GL_RGBA32F;
 bool drawPolygon = false;
 
 // Water Increment Source and Rain settings
-const unsigned int SOURCE_FLOW_CUTOFF_TIME = 25;
-const unsigned int RAIN_CUTOFF_TIME = 25;
+const unsigned int SOURCE_FLOW_CUTOFF_TIME = 15;
+const unsigned int RAIN_CUTOFF_TIME = 15;
 bool isSourceFlow = true;
 bool isRain = true;
 int numberOfRaindrops = 1;
 int rainRadius;
 
 // Simulation Settings
-const float TIME_STEP = 0.002f;
+const float TIME_STEP = min(0.002f, 1 / (MESH_WIDTH * 2.0f));
+
+// Key Press Settings
+const float KEY_PRESS_DELAY = 1.0f;
+float pLastPressTime = 0;
 
 int main()
 {
@@ -95,6 +101,8 @@ int main()
 	// glfw window creation
 	// --------------------
 	GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "OpenGLWaterSimulation", NULL, NULL);
+	glfwMaximizeWindow(window);
+
 	if (window == NULL)
 	{
 		std::cout << "Failed to create GLFW window" << std::endl;
@@ -135,10 +143,10 @@ int main()
 
 	// set up vertex data (and buffer(s)) and configure vertex attributes
 	// ------------------------------------------------------------------
-	Model ourModel("nanosuit/nanosuit.obj");
+	//Model ourModel("nanosuit/nanosuit.obj");
 
-	vector<unsigned int> meshIndices = GenerateMeshIndices(MESH_WIDTH, MESH_HEIGHT);
-	vector<float> meshVertices = GenerateMeshVertices(MESH_WIDTH, MESH_HEIGHT);
+	meshIndices = GenerateMeshIndices(MESH_WIDTH, MESH_HEIGHT);
+	meshVertices = GenerateMeshVertices(MESH_WIDTH, MESH_HEIGHT);
 	GenerateMeshTextures(MESH_WIDTH, MESH_HEIGHT);
 	
 	// Create mesh vertex array buffer
@@ -161,67 +169,7 @@ int main()
 	glEnableVertexAttribArray(1);
 	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
 
-	glBindVertexArray(0);
-
-	// create texture for initial column data
-	glGenTextures(1, &CDTextureID);
-	glBindTexture(GL_TEXTURE_2D, CDTextureID);
-	glTexImage2D(GL_TEXTURE_2D, 0, INTERNAL_TEXTURE_FORMAT, MESH_WIDTH, MESH_HEIGHT, 0, TEXTURE_FORMAT, GL_FLOAT, &CDTexture[0]);
-
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-	// create texture for initial flux
-	glGenTextures(1, &FTextureID);
-	glBindTexture(GL_TEXTURE_2D, FTextureID);
-	glTexImage2D(GL_TEXTURE_2D, 0, INTERNAL_TEXTURE_FORMAT, MESH_WIDTH, MESH_HEIGHT, 0, TEXTURE_FORMAT, GL_FLOAT, &FTexture[0]);
-
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-	// create texture for initial velocity
-	glGenTextures(1, &VTextureID);
-	glBindTexture(GL_TEXTURE_2D, VTextureID);
-	glTexImage2D(GL_TEXTURE_2D, 0, INTERNAL_TEXTURE_FORMAT, MESH_WIDTH, MESH_HEIGHT, 0, TEXTURE_FORMAT, GL_FLOAT, &VTexture[0]);
-
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-	// create texture for column data output
-	glGenTextures(1, &tempCDTextureID);
-	glBindTexture(GL_TEXTURE_2D, tempCDTextureID);
-	glTexImage2D(GL_TEXTURE_2D, 0, INTERNAL_TEXTURE_FORMAT, MESH_WIDTH, MESH_HEIGHT, 0, TEXTURE_FORMAT, GL_FLOAT, NULL);
-
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-	// create texture for flux output
-	glGenTextures(1, &tempFTextureID);
-	glBindTexture(GL_TEXTURE_2D, tempFTextureID);
-	glTexImage2D(GL_TEXTURE_2D, 0, INTERNAL_TEXTURE_FORMAT, MESH_WIDTH, MESH_HEIGHT, 0, TEXTURE_FORMAT, GL_FLOAT, NULL);
-
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-	// create texture for velocity output
-	glGenTextures(1, &tempVTextureID);
-	glBindTexture(GL_TEXTURE_2D, tempVTextureID);
-	glTexImage2D(GL_TEXTURE_2D, 0, INTERNAL_TEXTURE_FORMAT, MESH_WIDTH, MESH_HEIGHT, 0, TEXTURE_FORMAT, GL_FLOAT, NULL);
-
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glBindVertexArray(0);	
 
 	// Set static shader settings
 	// water increment shader static properties
@@ -239,6 +187,10 @@ int main()
 	waterIncrementComputeShader.setFloat("sources[1].Kis", 0.75f);
 	// set rain value
 	waterIncrementComputeShader.setInt("currentNumberRaindrops", numberOfRaindrops);
+	// Set source flow boolean
+	waterIncrementComputeShader.setBool("isSourceFlow", isSourceFlow);
+	// Set rain fall boolean
+	waterIncrementComputeShader.setBool("isRain", isRain);
 
 	// flux shader static properties
 	fluxUpdateComputeShader.use();
@@ -261,9 +213,9 @@ int main()
 	terrainRenderShader.setFloat("size", MESH_TOTAL_SIZE);
 	terrainRenderShader.setFloat("terrainShininess", 1.0f);
 	terrainRenderShader.setFloat("waterShininess", 64.0f);
-	terrainRenderShader.setVec3("terrainColor", 0.8f, 0.8f, 0.6f);
+	terrainRenderShader.setVec3("terrainColor", 0.87f, 0.85f, 0.6f);
 	terrainRenderShader.setVec3("terrainSpecularColor", 0.0f, 0.0f, 0.0f);
-	terrainRenderShader.setVec3("waterColor", 0.0f, 0.5f, 1.0f);
+	terrainRenderShader.setVec3("waterColor", 0.1f, 0.6f, 1.0f);
 	terrainRenderShader.setVec3("waterSpecularColor", 1.0f, 1.0f, 1.0f);
 	// set terrain render light properties
 	terrainRenderShader.setVec3("dirLight.direction", -0.0f, -1.0f, -0.0f);
@@ -274,6 +226,8 @@ int main()
 	float sourceFlowTime = 0;
 	float rainFallTime = 0;
 
+	glfwSetTime(0);
+
 	// render loop
 	// -----------
 	while (!glfwWindowShouldClose(window))
@@ -283,20 +237,6 @@ int main()
 		float currentFrame = glfwGetTime();
 		deltaTime = currentFrame - lastFrame;
 		lastFrame = currentFrame;
-
-		if (sourceFlowTime < SOURCE_FLOW_CUTOFF_TIME) {
-			sourceFlowTime += deltaTime;
-		}
-		else {
-			isSourceFlow = false;
-		}
-
-		if (rainFallTime < RAIN_CUTOFF_TIME) {
-			rainFallTime += deltaTime;
-		}
-		else {
-			isRain = false;
-		}
 
 		// input
 		// -----
@@ -310,11 +250,16 @@ int main()
 		glBindImageTexture(1, CDTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
 		glDispatchCompute((GLuint)MESH_WIDTH, (GLuint)MESH_HEIGHT, 1);
 		// Set Water Increment Shader Properties
-		// Set source flow boolean
-		waterIncrementComputeShader.setBool("isSourceFlow", isSourceFlow);
-		// Set rain fall boolean
-		waterIncrementComputeShader.setBool("isRain", isRain);
-		if (isRain) {
+		if (isSourceFlow && sourceFlowTime < SOURCE_FLOW_CUTOFF_TIME) {
+			sourceFlowTime += deltaTime;
+		}
+		else if (isSourceFlow) {
+			isSourceFlow = false;
+			waterIncrementComputeShader.setBool("isSourceFlow", isSourceFlow);
+		}
+
+		if (isRain && rainFallTime < RAIN_CUTOFF_TIME) {
+			rainFallTime += deltaTime;
 			for (int i = 0; i < numberOfRaindrops; i++) {
 				string raindrop = "raindrops[";
 				raindrop += std::to_string(i);
@@ -333,6 +278,10 @@ int main()
 				waterIncrementComputeShader.setInt(raindrop + radius, rainRadius);
 				waterIncrementComputeShader.setFloat(raindrop + increment, Kir);
 			}
+		}
+		else if (isRain) {
+			isRain = false;
+			waterIncrementComputeShader.setBool("isRain", isRain);
 		}
 		
 		// Prevent from moving on until all compute shader calculations are done
@@ -439,7 +388,7 @@ int main()
 		terrainRenderShader.setMat4("view", view);
 		
 		glm::mat4 model = glm::mat4(1.0f);
-		model = glm::translate(model, glm::vec3(-(float)MESH_TOTAL_SIZE / (float)2, 0.0f, (float)MESH_TOTAL_SIZE / (float)2));
+		model = glm::translate(model, glm::vec3(-(MESH_TOTAL_SIZE / 2.0f), 0.0f, -(MESH_TOTAL_SIZE / 2.0f)));
 		terrainRenderShader.setMat4("model", model);
 		
 		// bind texture
@@ -489,6 +438,19 @@ int main()
 		glfwPollEvents();
 	}
 
+	// Deallocate all opengl resources
+	// -----------------------------------------------------------
+	glDeleteVertexArrays(1, &meshVAO);
+	glDeleteBuffers(1, &meshVBO);
+	glDeleteBuffers(1, &meshEBO);
+	glDeleteProgram(waterIncrementComputeShader.ID);
+	glDeleteProgram(fluxUpdateComputeShader.ID);
+	glDeleteProgram(waterHeightUpdateComputeShader.ID);
+	glDeleteProgram(velocityFieldUpdateComputeShader.ID);
+	glDeleteProgram(evaporationComputeShader.ID);
+	glDeleteProgram(terrainRenderShader.ID);
+	glDeleteProgram(swapBuffersComputeShader.ID);
+
 	// glfw: terminate, clearing all previously allocated GLFW resources.
 	// ------------------------------------------------------------------
 	glfwTerminate();
@@ -515,12 +477,17 @@ void processInput(GLFWwindow *window)
 		camera.ProcessKeyboard(RIGHT, deltaTime);
 	}
 	if (glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS) {
-		drawPolygon = !drawPolygon;
-		if (drawPolygon) {
-			glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-		}
-		else {
-			glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+		float currentPressTime = glfwGetTime();
+
+		if (currentPressTime - pLastPressTime > KEY_PRESS_DELAY) {
+			pLastPressTime = currentPressTime;
+			drawPolygon = !drawPolygon;
+			if (drawPolygon) {
+				glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+			}
+			else {
+				glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+			}
 		}
 	}
 }
@@ -608,7 +575,7 @@ vector<float> GenerateMeshVertices(unsigned int width, unsigned int height) {
 			// vertex position
 			vertexList.push_back(i * MESH_SCALE);
 			vertexList.push_back(0);
-			vertexList.push_back(-j * MESH_SCALE);
+			vertexList.push_back(j * MESH_SCALE);
 
 			// vertex texture coordinate
 			vertexList.push_back((float)i / (width - 1));
@@ -645,30 +612,60 @@ vector<unsigned int> GenerateMeshIndices(unsigned int width, unsigned int height
 void GenerateMeshTextures(unsigned int width, unsigned int height) {
 	GenerateBaseTextures(width, height);
 
-	// column data texture binding
+	// create texture for initial column data
 	glGenTextures(1, &CDTextureID);
 	glBindTexture(GL_TEXTURE_2D, CDTextureID);
-	glTexImage2D(GL_TEXTURE_2D, 0, INTERNAL_TEXTURE_FORMAT, width, height, 0, TEXTURE_FORMAT, GL_FLOAT, &CDTexture[0]);
+	glTexImage2D(GL_TEXTURE_2D, 0, INTERNAL_TEXTURE_FORMAT, MESH_WIDTH, MESH_HEIGHT, 0, TEXTURE_FORMAT, GL_FLOAT, &CDTexture[0]);
 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-	// flux texture binding
+	// create texture for initial flux
 	glGenTextures(1, &FTextureID);
 	glBindTexture(GL_TEXTURE_2D, FTextureID);
-	glTexImage2D(GL_TEXTURE_2D, 0, INTERNAL_TEXTURE_FORMAT, width, height, 0, TEXTURE_FORMAT, GL_FLOAT, &FTexture[0]);
+	glTexImage2D(GL_TEXTURE_2D, 0, INTERNAL_TEXTURE_FORMAT, MESH_WIDTH, MESH_HEIGHT, 0, TEXTURE_FORMAT, GL_FLOAT, &FTexture[0]);
 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-	// velocity texture binding
+	// create texture for initial velocity
 	glGenTextures(1, &VTextureID);
 	glBindTexture(GL_TEXTURE_2D, VTextureID);
-	glTexImage2D(GL_TEXTURE_2D, 0, INTERNAL_TEXTURE_FORMAT, width, height, 0, TEXTURE_FORMAT, GL_FLOAT, &VTexture[0]);
+	glTexImage2D(GL_TEXTURE_2D, 0, INTERNAL_TEXTURE_FORMAT, MESH_WIDTH, MESH_HEIGHT, 0, TEXTURE_FORMAT, GL_FLOAT, &VTexture[0]);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+	// create texture for column data output
+	glGenTextures(1, &tempCDTextureID);
+	glBindTexture(GL_TEXTURE_2D, tempCDTextureID);
+	glTexImage2D(GL_TEXTURE_2D, 0, INTERNAL_TEXTURE_FORMAT, MESH_WIDTH, MESH_HEIGHT, 0, TEXTURE_FORMAT, GL_FLOAT, NULL);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+	// create texture for flux output
+	glGenTextures(1, &tempFTextureID);
+	glBindTexture(GL_TEXTURE_2D, tempFTextureID);
+	glTexImage2D(GL_TEXTURE_2D, 0, INTERNAL_TEXTURE_FORMAT, MESH_WIDTH, MESH_HEIGHT, 0, TEXTURE_FORMAT, GL_FLOAT, NULL);
+
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+	// create texture for velocity output
+	glGenTextures(1, &tempVTextureID);
+	glBindTexture(GL_TEXTURE_2D, tempVTextureID);
+	glTexImage2D(GL_TEXTURE_2D, 0, INTERNAL_TEXTURE_FORMAT, MESH_WIDTH, MESH_HEIGHT, 0, TEXTURE_FORMAT, GL_FLOAT, NULL);
 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -685,8 +682,14 @@ void GenerateBaseTextures(unsigned int width, unsigned int height) {
 
 			float iCoord = (float)i / (width - 1);
 			float jCoord = (float)j / (height - 1);
-			float noiseValue = glm::perlin(glm::tvec2<float, glm::precision::highp>(iCoord, jCoord)) + 0.5f * glm::perlin(glm::tvec2<float, glm::precision::highp>(2 * iCoord, 2 * jCoord)) + 0.25f * glm::perlin(glm::tvec2<float, glm::precision::highp>(4 * iCoord, 4 * jCoord));
-			noiseValue += 1;
+			float frequencyScale = 2;
+			float noiseValue = glm::perlin(glm::tvec2<float, glm::precision::highp>(frequencyScale * iCoord, frequencyScale * jCoord));
+			noiseValue += 0.5f * glm::perlin(glm::tvec2<float, glm::precision::highp>(frequencyScale * 2 * iCoord, frequencyScale * 2 * jCoord));
+			noiseValue += 0.25f * glm::perlin(glm::tvec2<float, glm::precision::highp>(frequencyScale * 4 * iCoord, frequencyScale * 4 * jCoord));
+			noiseValue += 0.125 * glm::perlin(glm::tvec2<float, glm::precision::highp>(frequencyScale * 8 * iCoord, frequencyScale * 8 * jCoord));
+			//noiseValue += 0.0625 * glm::perlin(glm::tvec2<float, glm::precision::highp>(frequencyScale * 16 * iCoord, frequencyScale * 16 * jCoord));
+			//noiseValue += 0.03125 * glm::perlin(glm::tvec2<float, glm::precision::highp>(frequencyScale * 32 * iCoord, frequencyScale * 32 * jCoord));
+			//noiseValue += 1;
 
 			noiseValue /= HEIGHT_SCALING_VALUE;
 
