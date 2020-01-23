@@ -41,9 +41,9 @@ float lastFrame = 0.0f;
 glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
 
 // mesh settings
-const unsigned int MESH_WIDTH = 256;
+const unsigned int MESH_WIDTH = 512;
 const unsigned int MESH_HEIGHT = MESH_WIDTH;
-const unsigned int MESH_TOTAL_SIZE = 10;
+const unsigned int MESH_TOTAL_SIZE = 5;
 const float MESH_SCALE = (float)MESH_TOTAL_SIZE / (float)MESH_WIDTH;
 unsigned int meshVAO, meshVBO, meshEBO;
 vector<unsigned int> meshIndices;
@@ -67,12 +67,20 @@ unsigned int tempCDTextureID, tempFTextureID, tempVTextureID;
 const GLenum TEXTURE_FORMAT = GL_RGBA;
 const GLenum INTERNAL_TEXTURE_FORMAT = GL_RGBA32F;
 
+// compute shader settings
+const unsigned int WORK_GROUP_SIZE_X = 32;
+const unsigned int WORK_GROUP_SIZE_Y = 32;
+const unsigned int WORK_GROUP_SIZE_Z = MESH_WIDTH; // Must be kept as MESH_WIDTh so that the number of groups in z remains 1
+const unsigned int NUM_GROUPS_X = MESH_WIDTH / WORK_GROUP_SIZE_X;
+const unsigned int NUM_GROUPS_Y = MESH_WIDTH / WORK_GROUP_SIZE_Y;
+const unsigned int NUM_GROUPS_Z = MESH_WIDTH / WORK_GROUP_SIZE_Z;
+
 // debug settings
 bool drawPolygon = false;
 
 // Water Increment Source and Rain settings
-const unsigned int SOURCE_FLOW_CUTOFF_TIME = 15;
-const unsigned int RAIN_CUTOFF_TIME = 15;
+const unsigned int SOURCE_FLOW_CUTOFF_TIME = 15 * max(1.0f, MESH_WIDTH / 256.0f);
+const unsigned int RAIN_CUTOFF_TIME = 15 * max(1.0f, MESH_WIDTH / 256.0f);
 bool isSourceFlow = true;
 bool isRain = true;
 int numberOfRaindrops = 1;
@@ -214,6 +222,7 @@ int main()
 	terrainRenderShader.setFloat("terrainShininess", 1.0f);
 	terrainRenderShader.setFloat("waterShininess", 64.0f);
 	terrainRenderShader.setVec3("terrainColor", 0.87f, 0.85f, 0.6f);
+	terrainRenderShader.setVec3("vegetationColor", 0.31f, 0.5f, 0.1f);
 	terrainRenderShader.setVec3("terrainSpecularColor", 0.0f, 0.0f, 0.0f);
 	terrainRenderShader.setVec3("waterColor", 0.1f, 0.6f, 1.0f);
 	terrainRenderShader.setVec3("waterSpecularColor", 1.0f, 1.0f, 1.0f);
@@ -248,7 +257,6 @@ int main()
 		glBindImageTexture(0, tempCDTextureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, INTERNAL_TEXTURE_FORMAT);
 		// Link CDTextureID to binding = 1 in water increment shader
 		glBindImageTexture(1, CDTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
-		glDispatchCompute((GLuint)MESH_WIDTH, (GLuint)MESH_HEIGHT, 1);
 		// Set Water Increment Shader Properties
 		if (isSourceFlow && sourceFlowTime < SOURCE_FLOW_CUTOFF_TIME) {
 			sourceFlowTime += deltaTime;
@@ -283,7 +291,8 @@ int main()
 			isRain = false;
 			waterIncrementComputeShader.setBool("isRain", isRain);
 		}
-		
+
+		glDispatchCompute((GLuint)NUM_GROUPS_X, (GLuint)NUM_GROUPS_Y, NUM_GROUPS_Z);
 		// Prevent from moving on until all compute shader calculations are done
 		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
@@ -295,8 +304,8 @@ int main()
 		glBindImageTexture(1, tempCDTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
 		// Link FTextureID to binding = 2 in flux update shader
 		glBindImageTexture(2, FTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
-		glDispatchCompute((GLuint)MESH_WIDTH, (GLuint)MESH_HEIGHT, 1);
-
+		
+		glDispatchCompute((GLuint)NUM_GROUPS_X, (GLuint)NUM_GROUPS_Y, NUM_GROUPS_Z);
 		// Prevent from moving on until all compute shader calculations are done
 		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
@@ -308,8 +317,8 @@ int main()
 		glBindImageTexture(1, tempCDTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
 		// Link tempFTextureID to binding = 2 in water height update shader
 		glBindImageTexture(2, tempFTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
-		glDispatchCompute((GLuint)MESH_WIDTH, (GLuint)MESH_HEIGHT, 1);
-
+		
+		glDispatchCompute((GLuint)NUM_GROUPS_X, (GLuint)NUM_GROUPS_Y, NUM_GROUPS_Z);
 		// Prevent from moving on until all compute shader calculations are done
 		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
@@ -325,8 +334,8 @@ int main()
 		glBindImageTexture(3, tempFTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
 		// Link VTextureID to binding = 4 in water height update shader
 		glBindImageTexture(4, VTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
-		glDispatchCompute((GLuint)MESH_WIDTH, (GLuint)MESH_HEIGHT, 1);
-
+		
+		glDispatchCompute((GLuint)NUM_GROUPS_X, (GLuint)NUM_GROUPS_Y, NUM_GROUPS_Z);
 		// Prevent from moving on until all compute shader calculations are done
 		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
@@ -338,8 +347,8 @@ int main()
 		glBindImageTexture(1, CDTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
 		// Link tempVTextureID to binding = 2 in water height update shader
 		glBindImageTexture(2, tempVTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
-		glDispatchCompute((GLuint)MESH_WIDTH, (GLuint)MESH_HEIGHT, 1);
-
+		
+		glDispatchCompute((GLuint)NUM_GROUPS_X, (GLuint)NUM_GROUPS_Y, NUM_GROUPS_Z);
 		// Prevent from moving on until all compute shader calculations are done
 		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
@@ -351,8 +360,8 @@ int main()
 		glBindImageTexture(1, tempCDTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
 		// Link tempVTextureID to binding = 2 in water height update shader
 		glBindImageTexture(2, tempVTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
-		glDispatchCompute((GLuint)MESH_WIDTH, (GLuint)MESH_HEIGHT, 1);
-
+		
+		glDispatchCompute((GLuint)NUM_GROUPS_X, (GLuint)NUM_GROUPS_Y, NUM_GROUPS_Z);
 		// Prevent from moving on until all compute shader calculations are done
 		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
@@ -362,8 +371,8 @@ int main()
 		glBindImageTexture(0, tempCDTextureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, INTERNAL_TEXTURE_FORMAT);
 		// Link tempCDTextureID to binding = 1 in the evaporation shader
 		glBindImageTexture(1, CDTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
-		glDispatchCompute((GLuint)MESH_WIDTH, (GLuint)MESH_HEIGHT, 1);
-
+		
+		glDispatchCompute((GLuint)NUM_GROUPS_X, (GLuint)NUM_GROUPS_Y, NUM_GROUPS_Z);
 		// Prevent from moving on until all compute shader calculations are done
 		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
@@ -405,8 +414,8 @@ int main()
 		glBindImageTexture(0, CDTextureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, INTERNAL_TEXTURE_FORMAT);
 		// Link tempCDTextureID to binding = 1 in the swap buffers shader
 		glBindImageTexture(1, tempCDTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
-		glDispatchCompute((GLuint)MESH_WIDTH, (GLuint)MESH_HEIGHT, 1);
-
+		
+		glDispatchCompute((GLuint)NUM_GROUPS_X, (GLuint)NUM_GROUPS_Y, NUM_GROUPS_Z);
 		// Prevent from moving on until all compute shader calculations are done
 		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
@@ -416,8 +425,8 @@ int main()
 		glBindImageTexture(0, FTextureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, INTERNAL_TEXTURE_FORMAT);
 		// Link tempFTextureID to binding = 1 in the swap buffers shader
 		glBindImageTexture(1, tempFTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
-		glDispatchCompute((GLuint)MESH_WIDTH, (GLuint)MESH_HEIGHT, 1);
-
+		
+		glDispatchCompute((GLuint)NUM_GROUPS_X, (GLuint)NUM_GROUPS_Y, NUM_GROUPS_Z);
 		// Prevent from moving on until all compute shader calculations are done
 		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
@@ -427,8 +436,8 @@ int main()
 		glBindImageTexture(0, VTextureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, INTERNAL_TEXTURE_FORMAT);
 		// Link tempVTextureID to binding = 1 in the swap buffers shader
 		glBindImageTexture(1, tempVTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
-		glDispatchCompute((GLuint)MESH_WIDTH, (GLuint)MESH_HEIGHT, 1);
-
+		
+		glDispatchCompute((GLuint)NUM_GROUPS_X, (GLuint)NUM_GROUPS_Y, NUM_GROUPS_Z);
 		// Prevent from moving on until all compute shader calculations are done
 		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
@@ -682,22 +691,30 @@ void GenerateBaseTextures(unsigned int width, unsigned int height) {
 
 			float iCoord = (float)i / (width - 1);
 			float jCoord = (float)j / (height - 1);
-			float frequencyScale = 2;
-			float noiseValue = glm::perlin(glm::tvec2<float, glm::precision::highp>(frequencyScale * iCoord, frequencyScale * jCoord));
-			noiseValue += 0.5f * glm::perlin(glm::tvec2<float, glm::precision::highp>(frequencyScale * 2 * iCoord, frequencyScale * 2 * jCoord));
-			noiseValue += 0.25f * glm::perlin(glm::tvec2<float, glm::precision::highp>(frequencyScale * 4 * iCoord, frequencyScale * 4 * jCoord));
-			noiseValue += 0.125 * glm::perlin(glm::tvec2<float, glm::precision::highp>(frequencyScale * 8 * iCoord, frequencyScale * 8 * jCoord));
-			//noiseValue += 0.0625 * glm::perlin(glm::tvec2<float, glm::precision::highp>(frequencyScale * 16 * iCoord, frequencyScale * 16 * jCoord));
-			//noiseValue += 0.03125 * glm::perlin(glm::tvec2<float, glm::precision::highp>(frequencyScale * 32 * iCoord, frequencyScale * 32 * jCoord));
-			//noiseValue += 1;
+			float terrainFrequencyScale = 2;
+			float terrainNoiseValue = glm::perlin(glm::tvec2<float, glm::precision::highp>(terrainFrequencyScale * iCoord, terrainFrequencyScale * jCoord));
+			terrainNoiseValue += 0.5f * glm::perlin(glm::tvec2<float, glm::precision::highp>(terrainFrequencyScale * 2 * iCoord, terrainFrequencyScale * 2 * jCoord));
+			terrainNoiseValue += 0.25f * glm::perlin(glm::tvec2<float, glm::precision::highp>(terrainFrequencyScale * 4 * iCoord, terrainFrequencyScale * 4 * jCoord));
+			terrainNoiseValue += 0.125 * glm::perlin(glm::tvec2<float, glm::precision::highp>(terrainFrequencyScale * 8 * iCoord, terrainFrequencyScale * 8 * jCoord));
+			//terrainNoiseValue += 0.0625 * glm::perlin(glm::tvec2<float, glm::precision::highp>(frequencyScale * 16 * iCoord, frequencyScale * 16 * jCoord));
+			//terrainNoiseValue += 0.03125 * glm::perlin(glm::tvec2<float, glm::precision::highp>(frequencyScale * 32 * iCoord, frequencyScale * 32 * jCoord));
+			//terrainNoiseValue += 1;
 
-			noiseValue /= HEIGHT_SCALING_VALUE;
+			terrainNoiseValue /= HEIGHT_SCALING_VALUE;
+
+			float moistureFrequencyScale = 4;
+			float moistureNoiseValue = glm::perlin(glm::tvec2<float, glm::precision::highp>(iCoord * moistureFrequencyScale * 0.93f, jCoord * moistureFrequencyScale * 0.93f));
+			moistureNoiseValue += 0.7f * glm::perlin(glm::tvec2<float, glm::precision::highp>(iCoord / 0.7f * moistureFrequencyScale, jCoord / 0.7f * moistureFrequencyScale));
+			moistureNoiseValue += 0.4f * glm::perlin(glm::tvec2<float, glm::precision::highp>(iCoord / 0.4f * moistureFrequencyScale, jCoord / 0.4f * moistureFrequencyScale));
+
+			moistureNoiseValue = max(0.0f, moistureNoiseValue);
+			moistureNoiseValue /= HEIGHT_SCALING_VALUE;
 
 			// initial column data texture
 			CDTexture[location + 0] = 0.0f; // R = water height value
-			CDTexture[location + 1] = noiseValue; // G = terrain height value
+			CDTexture[location + 1] = terrainNoiseValue; // G = terrain height value
 			CDTexture[location + 2] = 0.0f; // B = dissolved sediment value
-			CDTexture[location + 3] = 0.0f; // A
+			CDTexture[location + 3] = moistureNoiseValue; // A = moisture value
 
 			// initial flux texture
 			FTexture[location + 0] = 0.0f; // R = left flux value

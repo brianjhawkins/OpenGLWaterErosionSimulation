@@ -10,6 +10,7 @@ uniform sampler2D terrainTexture;
 uniform float size;
 
 uniform vec3 terrainColor;
+uniform vec3 vegetationColor;
 uniform vec3 waterColor;
 uniform vec3 terrainSpecularColor;
 uniform vec3 waterSpecularColor;
@@ -50,12 +51,14 @@ void main()
 	FragPos = vec3(model * vec4(newPosition, 1.0));
 	TexCoords = aTexCoords;
 
+	vec3 tempTerrainColor = mix(terrainColor, vegetationColor, max(0, terrainTextureValue.a * 5));
+
 	if(terrainTextureValue.r > 0.0f){
-		VertexColor = mix(waterColor, terrainColor, clamp(0.8f - terrainTextureValue.r * 30, 0.0f, 1.0f));
+		VertexColor = mix(waterColor, tempTerrainColor, clamp(0.8f - terrainTextureValue.r * 30, 0.0f, 1.0f));
 		VertexSpecularColor = waterSpecularColor;
 		VertexShininess = waterShininess;
 	} else {
-		VertexColor = terrainColor;
+		VertexColor = tempTerrainColor;
 		VertexSpecularColor = terrainSpecularColor;
 		VertexShininess = terrainShininess;
 	}

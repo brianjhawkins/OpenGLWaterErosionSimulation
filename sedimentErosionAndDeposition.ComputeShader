@@ -1,5 +1,5 @@
 #version 460 core
-layout(local_size_x = 1, local_size_y = 1) in;
+layout(local_size_x = 32, local_size_y = 32) in;
 
 layout(rgba32f, binding = 0) uniform image2D image_output;
 
@@ -19,11 +19,11 @@ void main()
 	vec4 centerVelocity = imageLoad(V_image, pixelCoords);
 
 	// Sediment Capacity constant
-	float Kc = 0.005f;
+	float Kc = 0.002f;
 	// Dissolving constant
-	float Ks = 0.003f;
+	float Ks = 0.003f * max(0, (1.0f - 2.0f * centerColumn.a));
 	// Deposition constant
-	float Kd = 0.003f;
+	float Kd = 0.005f;
 
 	float newTerrainHeight;
 	float newSedimentValue;
@@ -60,5 +60,5 @@ void main()
 		newSedimentValue = centerColumn.b - Kd * (centerColumn.b - sedimentCapacity);
 	}
 
-	imageStore(image_output, pixelCoords, vec4(centerColumn.r, newTerrainHeight, newSedimentValue, centerColumn.b));
+	imageStore(image_output, pixelCoords, vec4(centerColumn.r, newTerrainHeight, newSedimentValue, centerColumn.a));
 }
