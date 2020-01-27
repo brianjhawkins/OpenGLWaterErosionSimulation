@@ -39,17 +39,11 @@ void main()
 	vec2 right = textureOffset(terrainTexture, aTexCoords, ivec2(1, 0)).rg;
 	vec2 top = textureOffset(terrainTexture, aTexCoords, ivec2(0, 1)).rg;
 	vec2 bottom = textureOffset(terrainTexture, aTexCoords, ivec2(0, -1)).rg;
-	float leftHeight = (left.r + left.g) * size;
-	float rightHeight = (right.r + right.g) * size;
-	float topHeight = (top.r + top.g) * size;
-	float bottomHeight = (bottom.r + bottom.g) * size;
-	newNormal = vec3(leftHeight - rightHeight, 2 * texelSize.x, bottomHeight - topHeight);
-	newNormal = normalize(newNormal);
 
-    gl_Position = projection * view * model * vec4(newPosition, 1.0);
-	Normal = mat3(transpose(inverse(model))) * newNormal;
-	FragPos = vec3(model * vec4(newPosition, 1.0));
-	TexCoords = aTexCoords;
+	float leftHeight;
+	float rightHeight;
+	float topHeight;
+	float bottomHeight;
 
 	vec3 tempTerrainColor = mix(terrainColor, vegetationColor, max(0, terrainTextureValue.a * 5));
 
@@ -57,9 +51,27 @@ void main()
 		VertexColor = mix(waterColor, tempTerrainColor, clamp(0.8f - terrainTextureValue.r * 30, 0.0f, 1.0f));
 		VertexSpecularColor = waterSpecularColor;
 		VertexShininess = waterShininess;
+
+		leftHeight = (left.r + left.g) * size;
+		rightHeight = (right.r + right.g) * size;
+		topHeight = (top.r + top.g) * size;
+		bottomHeight = (bottom.r + bottom.g) * size;
 	} else {
 		VertexColor = tempTerrainColor;
 		VertexSpecularColor = terrainSpecularColor;
 		VertexShininess = terrainShininess;
+
+		leftHeight = left.g * size;
+		rightHeight = right.g * size;
+		topHeight = top.g * size;
+		bottomHeight = bottom.g * size;	
 	}
+
+	newNormal = vec3(leftHeight - rightHeight, 2 * texelSize.x, bottomHeight - topHeight);
+	newNormal = normalize(newNormal);
+
+    gl_Position = projection * view * model * vec4(newPosition, 1.0);
+	Normal = mat3(transpose(inverse(model))) * newNormal;
+	FragPos = vec3(model * vec4(newPosition, 1.0));
+	TexCoords = aTexCoords;	
 }

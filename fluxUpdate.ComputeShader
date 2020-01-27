@@ -39,7 +39,7 @@ void main()
 	float l = 1 / imageSize.x;
 	float A = l * l * 20;
 	float g = -9.8f;
-	float Kf = 0.99f;
+	float Kf = 0.999f;
 	
 	// Left Flux
 	if(pixelCoords.x == 0){

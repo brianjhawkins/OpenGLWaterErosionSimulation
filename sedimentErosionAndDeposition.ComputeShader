@@ -23,7 +23,7 @@ void main()
 	// Dissolving constant
 	float Ks = 0.003f * max(0, (1.0f - 2.0f * centerColumn.a));
 	// Deposition constant
-	float Kd = 0.005f;
+	float Kd = 0.001f;
 
 	float newTerrainHeight;
 	float newSedimentValue;

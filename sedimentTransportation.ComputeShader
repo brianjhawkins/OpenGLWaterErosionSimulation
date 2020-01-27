@@ -37,7 +37,7 @@ void main()
 	float nearestPreviousX = floor(xCoordinate);
 	float nearestPreviousY = floor(yCoordinate);
 
-	// Determine if the coordinate found in teh backtracking step is on the grid or not
+	// Determine if the coordinate found in the backtracking step is on the grid or not
 	// If it is on the grid, simply find its sediment value and return it
 	if(xCoordinate == nearestPreviousX && yCoordinate == nearestPreviousY){
 		newSedimentValue = imageLoad(CD_image, ivec2(xCoordinate, yCoordinate)).b;
