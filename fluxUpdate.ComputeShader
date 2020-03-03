@@ -40,6 +40,7 @@ void main()
 	float A = l * l * 20;
 	float g = -9.8f;
 	float Kf = 0.999f;
+	Kf = 1;
 	
 	// Left Flux
 	if(pixelCoords.x == 0){

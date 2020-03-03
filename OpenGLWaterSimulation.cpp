@@ -50,7 +50,14 @@ vector<unsigned int> meshIndices;
 vector<float> meshVertices;
 
 // camera
-Camera camera(glm::vec3(0.0f, 1.5f * MESH_TOTAL_SIZE, 0.0f));
+// Camera above the middle of the map
+//Camera camera(glm::vec3(0.0f, 1.5f * MESH_TOTAL_SIZE, 0.0f));
+
+// Camera just above the ground, focusing on distinction between vegetated and non-vegetated erosion
+Camera camera(glm::vec3(-0.2f * MESH_TOTAL_SIZE / 2.0f, 0.4f * MESH_TOTAL_SIZE, -0.4f * MESH_TOTAL_SIZE / 2.0f), glm::vec3(0, 1, 0), 35, -55);
+
+// Camera zoomed out to view entire terrain
+//Camera camera(glm::vec3(-1.9f * MESH_TOTAL_SIZE / 2.0f, 1.0f * MESH_TOTAL_SIZE, -1.3f * MESH_TOTAL_SIZE / 2.0f), glm::vec3(0, 1, 0), 35, -45);
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
@@ -62,6 +69,7 @@ vector<float> FTexture(MESH_WIDTH * MESH_HEIGHT * 4);
 vector<float> VTexture(MESH_WIDTH * MESH_HEIGHT * 4);
 unsigned int CDTextureID, FTextureID, VTextureID;
 unsigned int tempCDTextureID, tempFTextureID, tempVTextureID;
+bool isVegetation = true;
 
 // texture settings
 const GLenum TEXTURE_FORMAT = GL_RGBA;
@@ -703,18 +711,24 @@ void GenerateBaseTextures(unsigned int width, unsigned int height) {
 			terrainNoiseValue /= HEIGHT_SCALING_VALUE;
 
 			float moistureFrequencyScale = 4;
-			float moistureNoiseValue = glm::perlin(glm::tvec2<float, glm::precision::highp>(iCoord * moistureFrequencyScale * 0.93f, jCoord * moistureFrequencyScale * 0.93f));
-			moistureNoiseValue += 0.7f * glm::perlin(glm::tvec2<float, glm::precision::highp>(iCoord / 0.7f * moistureFrequencyScale, jCoord / 0.7f * moistureFrequencyScale));
-			moistureNoiseValue += 0.4f * glm::perlin(glm::tvec2<float, glm::precision::highp>(iCoord / 0.4f * moistureFrequencyScale, jCoord / 0.4f * moistureFrequencyScale));
+			float moistureNoiseValue;
+			if (isVegetation) {
+				moistureNoiseValue = glm::perlin(glm::tvec2<float, glm::precision::highp>(iCoord * moistureFrequencyScale * 0.93f, jCoord * moistureFrequencyScale * 0.93f));
+				moistureNoiseValue += 0.7f * glm::perlin(glm::tvec2<float, glm::precision::highp>(iCoord / 0.7f * moistureFrequencyScale, jCoord / 0.7f * moistureFrequencyScale));
+				moistureNoiseValue += 0.4f * glm::perlin(glm::tvec2<float, glm::precision::highp>(iCoord / 0.4f * moistureFrequencyScale, jCoord / 0.4f * moistureFrequencyScale));
 
-			moistureNoiseValue = max(0.0f, moistureNoiseValue);
-			moistureNoiseValue /= HEIGHT_SCALING_VALUE;
+				moistureNoiseValue = max(0.0f, moistureNoiseValue);
+				moistureNoiseValue /= HEIGHT_SCALING_VALUE;
+			}
+			else {
+				moistureNoiseValue = 0;
+			}
 
 			// initial column data texture
 			CDTexture[location + 0] = 0.0f; // R = water height value
 			CDTexture[location + 1] = terrainNoiseValue; // G = terrain height value
 			CDTexture[location + 2] = 0.0f; // B = dissolved sediment value
-			CDTexture[location + 3] = moistureNoiseValue; // A = moisture value
+			CDTexture[location + 3] = moistureNoiseValue; // A = moisture value for vegetation placement
 
 			// initial flux texture
 			FTexture[location + 0] = 0.0f; // R = left flux value
