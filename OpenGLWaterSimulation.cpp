@@ -54,10 +54,11 @@ vector<float> meshVertices;
 //Camera camera(glm::vec3(0.0f, 1.5f * MESH_TOTAL_SIZE, 0.0f));
 
 // Camera just above the ground, focusing on distinction between vegetated and non-vegetated erosion
-Camera camera(glm::vec3(-0.2f * MESH_TOTAL_SIZE / 2.0f, 0.4f * MESH_TOTAL_SIZE, -0.4f * MESH_TOTAL_SIZE / 2.0f), glm::vec3(0, 1, 0), 35, -55);
+//Camera camera(glm::vec3(-0.2f * MESH_TOTAL_SIZE / 2.0f, 0.4f * MESH_TOTAL_SIZE, -0.4f * MESH_TOTAL_SIZE / 2.0f), glm::vec3(0, 1, 0), 35, -55);
 
 // Camera zoomed out to view entire terrain
-//Camera camera(glm::vec3(-1.9f * MESH_TOTAL_SIZE / 2.0f, 1.0f * MESH_TOTAL_SIZE, -1.3f * MESH_TOTAL_SIZE / 2.0f), glm::vec3(0, 1, 0), 35, -45);
+Camera camera(glm::vec3(-1.9f * MESH_TOTAL_SIZE / 2.0f, 1.0f * MESH_TOTAL_SIZE, -1.3f * MESH_TOTAL_SIZE / 2.0f), glm::vec3(0, 1, 0), 35, -45);
+
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
@@ -87,8 +88,8 @@ const unsigned int NUM_GROUPS_Z = MESH_WIDTH / WORK_GROUP_SIZE_Z;
 bool drawPolygon = false;
 
 // Water Increment Source and Rain settings
-const unsigned int SOURCE_FLOW_CUTOFF_TIME = 15 * max(1.0f, MESH_WIDTH / 256.0f);
-const unsigned int RAIN_CUTOFF_TIME = 15 * max(1.0f, MESH_WIDTH / 256.0f);
+const unsigned int SOURCE_FLOW_CUTOFF_TIME = (unsigned int)(15 * max(1.0f, MESH_WIDTH / 256.0f));
+const unsigned int RAIN_CUTOFF_TIME = (unsigned int)(15 * max(1.0f, MESH_WIDTH / 256.0f));
 bool isSourceFlow = true;
 bool isRain = true;
 int numberOfRaindrops = 1;
@@ -194,11 +195,11 @@ int main()
 	// set source values
 	waterIncrementComputeShader.setInt("currentNumberSources", 2);
 	// Source 1
-	waterIncrementComputeShader.setIVec2("sources[0].position", 0.25f * MESH_WIDTH, 0.25f * MESH_HEIGHT);
+	waterIncrementComputeShader.setIVec2("sources[0].position", (int)(0.25f * MESH_WIDTH), (int)(0.25f * MESH_HEIGHT));
 	waterIncrementComputeShader.setInt("sources[0].radius", MESH_WIDTH / 20);
 	waterIncrementComputeShader.setFloat("sources[0].Kis", 0.5f);
 	// Source 2
-	waterIncrementComputeShader.setIVec2("sources[1].position", 0.75f * MESH_WIDTH, 0.75f * MESH_HEIGHT);
+	waterIncrementComputeShader.setIVec2("sources[1].position", (int)(0.75f * MESH_WIDTH), (int)(0.75f * MESH_HEIGHT));
 	waterIncrementComputeShader.setInt("sources[1].radius", MESH_WIDTH / 40);
 	waterIncrementComputeShader.setFloat("sources[1].Kis", 0.75f);
 	// set rain value
@@ -251,9 +252,11 @@ int main()
 	{
 		// per-frame time logic
 		// --------------------
-		float currentFrame = glfwGetTime();
+		float currentFrame = (float)glfwGetTime();
 		deltaTime = currentFrame - lastFrame;
 		lastFrame = currentFrame;
+
+		cout << 1 / deltaTime << endl;
 
 		// input
 		// -----
@@ -283,7 +286,7 @@ int main()
 				string radius = "].radius";
 				string increment = "].Kir";
 
-				float Kir = glm::linearRand(3, 5);
+				float Kir = (float)glm::linearRand(3, 5);
 
 				rainRadius = MESH_WIDTH / 100;
 
@@ -387,14 +390,14 @@ int main()
 		// Final Pass: Terrain Render Step
 		// render
 		// ------
-		glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+		glClearColor(0.8f, 0.8f, 0.8f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);	
 
 		// activate terrain render shader
 		terrainRenderShader.use();
 		// set shader properties
 		terrainRenderShader.setVec3("viewPos", camera.Position);
-		terrainRenderShader.setFloat("terrainTexture", tempCDTextureID);		
+		terrainRenderShader.setFloat("terrainTexture", (float)tempCDTextureID);		
 
 		// pass projection matrix to shader (note that in this case it could change every frame)
 		glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
@@ -494,7 +497,7 @@ void processInput(GLFWwindow *window)
 		camera.ProcessKeyboard(RIGHT, deltaTime);
 	}
 	if (glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS) {
-		float currentPressTime = glfwGetTime();
+		float currentPressTime = (float)glfwGetTime();
 
 		if (currentPressTime - pLastPressTime > KEY_PRESS_DELAY) {
 			pLastPressTime = currentPressTime;
@@ -525,16 +528,16 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 {
 	if (firstMouse)
 	{
-		lastX = xpos;
-		lastY = ypos;
+		lastX = (float)xpos;
+		lastY = (float)ypos;
 		firstMouse = false;
 	}
 
-	float xoffset = xpos - lastX;
-	float yoffset = lastY - ypos; // reversed since y-coordinates go from bottom to top
+	float xoffset = (float)xpos - lastX;
+	float yoffset = lastY - (float)ypos; // reversed since y-coordinates go from bottom to top
 
-	lastX = xpos;
-	lastY = ypos;
+	lastX = (float)xpos;
+	lastY = (float)ypos;
 
 	camera.ProcessMouseMovement(xoffset, yoffset);
 }
@@ -543,7 +546,7 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 // ----------------------------------------------------------------------
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
-	camera.ProcessMouseScroll(yoffset);
+	camera.ProcessMouseScroll((float)yoffset);
 }
 
 unsigned int loadTexture(char const* path) {
@@ -587,8 +590,8 @@ vector<float> GenerateMeshVertices(unsigned int width, unsigned int height) {
 	vector<float> vertexList;
 
 	// Generate vertex positions and texture coordinates
-	for (int j = 0; j < height; j++) {
-		for (int i = 0; i < width; i++) {
+	for (unsigned int j = 0; j < height; j++) {
+		for (unsigned int i = 0; i < width; i++) {
 			// vertex position
 			vertexList.push_back(i * MESH_SCALE);
 			vertexList.push_back(0);
@@ -607,8 +610,8 @@ vector<unsigned int> GenerateMeshIndices(unsigned int width, unsigned int height
 	vector<unsigned int> indexList;
 	unsigned int index;
 
-	for (int j = 0; j < height - 1; j++) {
-		for (int i = 0; i < width - 1; i++) {
+	for (unsigned int j = 0; j < height - 1; j++) {
+		for (unsigned int i = 0; i < width - 1; i++) {
 			index = i + j * width;
 
 			// first triangle
@@ -693,8 +696,8 @@ void GenerateMeshTextures(unsigned int width, unsigned int height) {
 void GenerateBaseTextures(unsigned int width, unsigned int height) {
 	unsigned int location;
 
-	for (int j = 0; j < height; j++) {
-		for (int i = 0; i < width; i++) {
+	for (unsigned int j = 0; j < height; j++) {
+		for (unsigned int i = 0; i < width; i++) {
 			location = (i + j * width) * 4;
 
 			float iCoord = (float)i / (width - 1);
@@ -703,9 +706,9 @@ void GenerateBaseTextures(unsigned int width, unsigned int height) {
 			float terrainNoiseValue = glm::perlin(glm::tvec2<float, glm::precision::highp>(terrainFrequencyScale * iCoord, terrainFrequencyScale * jCoord));
 			terrainNoiseValue += 0.5f * glm::perlin(glm::tvec2<float, glm::precision::highp>(terrainFrequencyScale * 2 * iCoord, terrainFrequencyScale * 2 * jCoord));
 			terrainNoiseValue += 0.25f * glm::perlin(glm::tvec2<float, glm::precision::highp>(terrainFrequencyScale * 4 * iCoord, terrainFrequencyScale * 4 * jCoord));
-			terrainNoiseValue += 0.125 * glm::perlin(glm::tvec2<float, glm::precision::highp>(terrainFrequencyScale * 8 * iCoord, terrainFrequencyScale * 8 * jCoord));
-			//terrainNoiseValue += 0.0625 * glm::perlin(glm::tvec2<float, glm::precision::highp>(frequencyScale * 16 * iCoord, frequencyScale * 16 * jCoord));
-			//terrainNoiseValue += 0.03125 * glm::perlin(glm::tvec2<float, glm::precision::highp>(frequencyScale * 32 * iCoord, frequencyScale * 32 * jCoord));
+			terrainNoiseValue += 0.125f * glm::perlin(glm::tvec2<float, glm::precision::highp>(terrainFrequencyScale * 8 * iCoord, terrainFrequencyScale * 8 * jCoord));
+			//terrainNoiseValue += 0.0625f * glm::perlin(glm::tvec2<float, glm::precision::highp>(frequencyScale * 16 * iCoord, frequencyScale * 16 * jCoord));
+			//terrainNoiseValue += 0.03125f * glm::perlin(glm::tvec2<float, glm::precision::highp>(frequencyScale * 32 * iCoord, frequencyScale * 32 * jCoord));
 			//terrainNoiseValue += 1;
 
 			terrainNoiseValue /= HEIGHT_SCALING_VALUE;
@@ -719,6 +722,7 @@ void GenerateBaseTextures(unsigned int width, unsigned int height) {
 
 				moistureNoiseValue = max(0.0f, moistureNoiseValue);
 				moistureNoiseValue /= HEIGHT_SCALING_VALUE;
+				//cout << moistureNoiseValue << endl;
 			}
 			else {
 				moistureNoiseValue = 0;
