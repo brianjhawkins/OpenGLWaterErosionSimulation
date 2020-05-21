@@ -67,7 +67,7 @@ void main()
 
 	// Average amount of water passing through a column in the x and y directions
 	Wx = (inLeft - centerFlux.r + centerFlux.g - inRight) / 2;
-	Wy = (inTop - centerFlux.b + centerFlux.a - inBottom);
+	Wy = (inTop - centerFlux.b + centerFlux.a - inBottom) / 2;
 
 	// Average water height this update cycle based on what the water height was before the changes were made to it in the cycle
 	averageWaterHeight = (centerColumn1.r + centerColumn2.r) / 2;
@@ -78,8 +78,8 @@ void main()
 	}
 	else{
 		velocityX = Wx / ((1.0f / imageSize.x) * averageWaterHeight);
-		velocityX = Wy / ((1.0f / imageSize.y) * averageWaterHeight);
+		velocityY = Wy / ((1.0f / imageSize.y) * averageWaterHeight);
 	}
 
-	imageStore(image_output, pixelCoords, vec4(velocityX, velocityY, 0, 0));
+	imageStore(image_output, pixelCoords, vec4(velocityX, velocityY, centerVelocity.b, centerVelocity.a));
 }

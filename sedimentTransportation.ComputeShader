@@ -24,8 +24,8 @@ void main()
 
 	// Use backtracking to calculate advection values
 	// Determine where the sediment that should be in this point was last timestep
-	float xCoordinate = (pixelCoords.x / imageSize.x) - (centerVelocity.x * timeStep);
-	float yCoordinate = (pixelCoords.y / imageSize.y) - (centerVelocity.y * timeStep);
+	float xCoordinate = (pixelCoords.x / imageSize.x) - (centerVelocity.r * timeStep);
+	float yCoordinate = (pixelCoords.y / imageSize.y) - (centerVelocity.g * timeStep);
 
 	float width = imageSize.x;
 	float height = imageSize.y;

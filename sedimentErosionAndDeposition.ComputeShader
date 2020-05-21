@@ -45,7 +45,7 @@ void main()
 	// Should be a value between -1 and 1, otherwise acos is undefined for it
 	localTiltAngle = acos(dot(flatNormal, normal));
 
-	float sedimentCapacity = Kc * sin(localTiltAngle) * length(centerVelocity);
+	float sedimentCapacity = Kc * sin(localTiltAngle) * length(centerVelocity.rg);
 
 	// If sediment capacity of water is greater than current amount of sediment dissolved into water
 	// dissolve some more terrain into the water and adjust terrain height and sediment value accordingly

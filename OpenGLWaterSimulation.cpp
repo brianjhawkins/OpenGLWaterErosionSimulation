@@ -310,7 +310,7 @@ int main()
 		// Second Pass: Flux Update Step
 		fluxUpdateComputeShader.use();
 		// Link tempFTextureID to binding = 0 in flux update shader
-		glBindImageTexture(0, tempFTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
+		glBindImageTexture(0, tempFTextureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, INTERNAL_TEXTURE_FORMAT);
 		// Link tempCDTextureID to binding = 1 in flux update shader
 		glBindImageTexture(1, tempCDTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
 		// Link FTextureID to binding = 2 in flux update shader
@@ -323,7 +323,7 @@ int main()
 		// Third Pass: Water Height Update Step
 		waterHeightUpdateComputeShader.use();
 		// Link CDTextureID to binding = 0 in water height update shader
-		glBindImageTexture(0, CDTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
+		glBindImageTexture(0, CDTextureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, INTERNAL_TEXTURE_FORMAT);
 		// Link tempCDTextureID to binding = 1 in water height update shader
 		glBindImageTexture(1, tempCDTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
 		// Link tempFTextureID to binding = 2 in water height update shader
@@ -336,7 +336,7 @@ int main()
 		// Fourth Pass: Velocity Field Update Step
 		velocityFieldUpdateComputeShader.use();
 		// Link tempVTextureID to binding = 0 in water height update shader
-		glBindImageTexture(0, tempVTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
+		glBindImageTexture(0, tempVTextureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, INTERNAL_TEXTURE_FORMAT);
 		// Link CDTextureID to binding = 1 in water height update shader
 		glBindImageTexture(1, CDTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
 		// Link tempCDTextureID to binding = 2 in water height update shader
@@ -353,7 +353,7 @@ int main()
 		// Fifth Pass: Sediment Erosion/Deposition Step
 		sedimentErosionAndDepositionComputeShader.use();
 		// Link tempCDTextureID to binding = 0 in water height update shader
-		glBindImageTexture(0, tempCDTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
+		glBindImageTexture(0, tempCDTextureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, INTERNAL_TEXTURE_FORMAT);
 		// Link CDTextureID to binding = 1 in water height update shader
 		glBindImageTexture(1, CDTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
 		// Link tempVTextureID to binding = 2 in water height update shader
@@ -363,10 +363,10 @@ int main()
 		// Prevent from moving on until all compute shader calculations are done
 		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
-		// Sixth Pass: Sediment Erosion/Deposition Step
+		// Sixth Pass: Sediment Transportation Step
 		sedimentTransportationComputeShader.use();
 		// Link CDTextureID to binding = 0 in water height update shader
-		glBindImageTexture(0, CDTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
+		glBindImageTexture(0, CDTextureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, INTERNAL_TEXTURE_FORMAT);
 		// Link tempCDTextureID to binding = 1 in water height update shader
 		glBindImageTexture(1, tempCDTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
 		// Link tempVTextureID to binding = 2 in water height update shader
@@ -397,7 +397,8 @@ int main()
 		terrainRenderShader.use();
 		// set shader properties
 		terrainRenderShader.setVec3("viewPos", camera.Position);
-		terrainRenderShader.setFloat("terrainTexture", (float)tempCDTextureID);		
+		terrainRenderShader.setInt("terrainTexture", 0);
+		terrainRenderShader.setInt("velocityTexture", 1);
 
 		// pass projection matrix to shader (note that in this case it could change every frame)
 		glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
@@ -412,7 +413,10 @@ int main()
 		terrainRenderShader.setMat4("model", model);
 		
 		// bind texture
+		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, tempCDTextureID);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, tempVTextureID);
 
 		// render mesh
 		glBindVertexArray(meshVAO);
@@ -722,7 +726,6 @@ void GenerateBaseTextures(unsigned int width, unsigned int height) {
 
 				moistureNoiseValue = max(0.0f, moistureNoiseValue);
 				moistureNoiseValue /= HEIGHT_SCALING_VALUE;
-				//cout << moistureNoiseValue << endl;
 			}
 			else {
 				moistureNoiseValue = 0;
@@ -732,7 +735,7 @@ void GenerateBaseTextures(unsigned int width, unsigned int height) {
 			CDTexture[location + 0] = 0.0f; // R = water height value
 			CDTexture[location + 1] = terrainNoiseValue; // G = terrain height value
 			CDTexture[location + 2] = 0.0f; // B = dissolved sediment value
-			CDTexture[location + 3] = moistureNoiseValue; // A = moisture value for vegetation placement
+			CDTexture[location + 3] = 0.0f; // A = regolith thickness value
 
 			// initial flux texture
 			FTexture[location + 0] = 0.0f; // R = left flux value
@@ -743,7 +746,7 @@ void GenerateBaseTextures(unsigned int width, unsigned int height) {
 			// initial velocity texture
 			VTexture[location + 0] = 0.0f; // R = velocity in x-direction
 			VTexture[location + 1] = 0.0f; // G = velocity in y-direction
-			VTexture[location + 2] = 0.0f; // B 
+			VTexture[location + 2] = moistureNoiseValue; // B = moisture value for vegetation placement
 			VTexture[location + 3] = 0.0f; // A 
 		}
 	}

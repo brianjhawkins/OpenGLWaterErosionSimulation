@@ -7,6 +7,7 @@ uniform mat4 view;
 uniform mat4 projection;
 
 uniform sampler2D terrainTexture;
+uniform sampler2D velocityTexture;
 uniform float size;
 
 uniform vec3 terrainColor;
@@ -27,6 +28,7 @@ out float VertexShininess;
 void main()
 {
 	vec4 terrainTextureValue = texture(terrainTexture, aTexCoords);
+	vec4 velocityTextureValue = texture(velocityTexture, aTexCoords);
 	
 	vec3 newPosition = aPos;
 	float newY = (terrainTextureValue.r + terrainTextureValue.g) * size;
@@ -45,7 +47,8 @@ void main()
 	float topHeight;
 	float bottomHeight;
 
-	vec3 tempTerrainColor = mix(terrainColor, vegetationColor, max(0, terrainTextureValue.a * 5));
+	// vec3 tempTerrainColor = mix(terrainColor, vegetationColor, max(0, terrainTextureValue.a * 5));
+	vec3 tempTerrainColor = mix(terrainColor, vegetationColor, max(0, velocityTextureValue.b * 5));
 
 	if(terrainTextureValue.r > 0.0f){
 		VertexColor = mix(waterColor, tempTerrainColor, clamp(0.8f - terrainTextureValue.r * 30, 0.0f, 1.0f));

@@ -75,7 +75,7 @@ void main()
 	}
 
 	// Scaling Factor K
-	if(leftFlux != 0 || rightFlux != 0 || topFlux != 0 || bottomFlux != 0){
+	if((leftFlux != 0 || rightFlux != 0 || topFlux != 0 || bottomFlux != 0) && centerColumn.r != 0){
 		K = min(1, (centerColumn.r * l * l) / ((leftFlux + rightFlux + topFlux + bottomFlux) * timeStep));
 	}
 	else{
