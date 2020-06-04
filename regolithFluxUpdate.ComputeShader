@@ -5,12 +5,12 @@ layout(rgba32f, binding = 0) uniform image2D image_output;
 
 layout(rgba32f, binding = 1) uniform image2D CD_image;
 
-layout(rgba32f, binding = 2) uniform image2D F_image;
+layout(rgba32f, binding = 2) uniform image2D R_image;
 
 uniform float timeStep;
 
 float heightDifference(vec4 center, vec4 adjacent){
-	return max(center.g + center.a, adjacent.r + adjacent.g + adjacent.a) - (center.r + center.g + center.a);
+	return max(center.g, adjacent.a + adjacent.g) - (center.a + center.g);
 }
 
 void main()
@@ -22,7 +22,7 @@ void main()
 	ivec2 deltaY = ivec2(0, 1);
 
 	vec4 centerColumn = imageLoad(CD_image, pixelCoords);
-	vec4 centerFlux = imageLoad(F_image, pixelCoords);
+	vec4 centerFlux = imageLoad(R_image, pixelCoords);
 
 	vec4 leftColumn = imageLoad(CD_image, pixelCoords - deltaX);
 	vec4 rightColumn = imageLoad(CD_image, pixelCoords + deltaX);
@@ -76,7 +76,7 @@ void main()
 
 	// Scaling Factor K
 	if((leftFlux != 0 || rightFlux != 0 || topFlux != 0 || bottomFlux != 0) && centerColumn.r != 0){
-		K = min(1, (centerColumn.r * l * l) / ((leftFlux + rightFlux + topFlux + bottomFlux) * timeStep));
+		K = min(1, (centerColumn.a * l * l) / ((leftFlux + rightFlux + topFlux + bottomFlux) * timeStep));
 	}
 	else{
 		K = 0;

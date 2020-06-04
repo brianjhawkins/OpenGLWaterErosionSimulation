@@ -5,12 +5,12 @@ layout(rgba32f, binding = 0) uniform image2D image_output;
 
 layout(rgba32f, binding = 1) uniform image2D CD_image;
 
-layout(rgba32f, binding = 2) uniform image2D F_image;
+layout(rgba32f, binding = 2) uniform image2D R_image;
 
 uniform float timeStep;
 
 float heightDifference(vec4 center, vec4 adjacent){
-	return (center.r + center.g + center.a - adjacent.r - adjacent.g - adjacent.a);
+	return (center.a + center.g - adjacent.a - adjacent.g);
 }
 
 void main()
@@ -22,7 +22,7 @@ void main()
 	ivec2 deltaY = ivec2(0, 1);
 
 	vec4 centerColumn = imageLoad(CD_image, pixelCoords);
-	vec4 centerFlux = imageLoad(F_image, pixelCoords);
+	vec4 centerFlux = imageLoad(R_image, pixelCoords);
 
 	float inLeft = 0;
 	float inRight = 0;
@@ -32,39 +32,41 @@ void main()
 	float l = 1 / imageSize.x;
 	float volumeChange;
 
-	float newWaterHeight;
+	float newRegolithHeight;
+	float newTerrainHeight;
 
 	if(pixelCoords.x == 0){
 		inLeft = 0;
 	}
 	else{
-		inLeft = imageLoad(F_image, pixelCoords - deltaX).g;
+		inLeft = imageLoad(R_image, pixelCoords - deltaX).g;
 	}
 
 	if(pixelCoords.x == imageSize.x - 1){
 		inRight = 0;
 	}
 	else{
-		inRight = imageLoad(F_image, pixelCoords + deltaX).r;
+		inRight = imageLoad(R_image, pixelCoords + deltaX).r;
 	}
 
 	if(pixelCoords.y == imageSize.y - 1){
 		inTop = 0;
 	}
 	else{
-		inTop = imageLoad(F_image, pixelCoords + deltaY).a;
+		inTop = imageLoad(R_image, pixelCoords + deltaY).a;
 	}
 
 	if(pixelCoords.y == 0){
 		inBottom = 0;
 	}
 	else{
-		inBottom = imageLoad(F_image, pixelCoords - deltaY).b;
+		inBottom = imageLoad(R_image, pixelCoords - deltaY).b;
 	}
 
 	volumeChange = timeStep * ((inLeft + inRight + inTop + inBottom) - (centerFlux.r + centerFlux.g + centerFlux.b + centerFlux.a));
 
-	newWaterHeight = centerColumn.r + (volumeChange / (l * l));
+	newRegolithHeight = centerColumn.a + (volumeChange / (l * l));
+	newTerrainHeight = centerColumn.g - (volumeChange / (l * l));
 
-	imageStore(image_output, pixelCoords, vec4(newWaterHeight, centerColumn.g, centerColumn.b, centerColumn.a));
+	imageStore(image_output, pixelCoords, vec4(centerColumn.a, newTerrainHeight, centerColumn.b, newRegolithHeight));
 }

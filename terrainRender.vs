@@ -25,52 +25,40 @@ out vec3 VertexColor;
 out vec3 VertexSpecularColor;
 out float VertexShininess;
 
+float Height(vec4 v){
+	return (v.r + v.g + v.a) * size;
+}
+
 void main()
 {
 	vec4 terrainTextureValue = texture(terrainTexture, aTexCoords);
 	vec4 velocityTextureValue = texture(velocityTexture, aTexCoords);
 	
 	vec3 newPosition = aPos;
-	float newY = (terrainTextureValue.r + terrainTextureValue.g) * size;
+	float newY = Height(terrainTextureValue);
 	newPosition.y = newY;
 	
 	vec3 newNormal;
 	vec2 textureSize = textureSize(terrainTexture, 0);
 	vec2 texelSize = vec2(1.0f / textureSize.x, 1.0f / textureSize.y);
-	vec2 left = textureOffset(terrainTexture, aTexCoords, ivec2(-1, 0)).rg;
-	vec2 right = textureOffset(terrainTexture, aTexCoords, ivec2(1, 0)).rg;
-	vec2 top = textureOffset(terrainTexture, aTexCoords, ivec2(0, 1)).rg;
-	vec2 bottom = textureOffset(terrainTexture, aTexCoords, ivec2(0, -1)).rg;
+	vec4 left = textureOffset(terrainTexture, aTexCoords, ivec2(-1, 0));
+	vec4 right = textureOffset(terrainTexture, aTexCoords, ivec2(1, 0));
+	vec4 top = textureOffset(terrainTexture, aTexCoords, ivec2(0, 1));
+	vec4 bottom = textureOffset(terrainTexture, aTexCoords, ivec2(0, -1));
 
-	float leftHeight;
-	float rightHeight;
-	float topHeight;
-	float bottomHeight;
-
-	// vec3 tempTerrainColor = mix(terrainColor, vegetationColor, max(0, terrainTextureValue.a * 5));
 	vec3 tempTerrainColor = mix(terrainColor, vegetationColor, max(0, velocityTextureValue.b * 5));
 
 	if(terrainTextureValue.r > 0.0f){
 		VertexColor = mix(waterColor, tempTerrainColor, clamp(0.8f - terrainTextureValue.r * 30, 0.0f, 1.0f));
 		VertexSpecularColor = waterSpecularColor;
-		VertexShininess = waterShininess;
-
-		leftHeight = (left.r + left.g) * size;
-		rightHeight = (right.r + right.g) * size;
-		topHeight = (top.r + top.g) * size;
-		bottomHeight = (bottom.r + bottom.g) * size;
+		VertexShininess = waterShininess;		
 	} else {
 		VertexColor = tempTerrainColor;
 		VertexSpecularColor = terrainSpecularColor;
-		VertexShininess = terrainShininess;
-
-		leftHeight = left.g * size;
-		rightHeight = right.g * size;
-		topHeight = top.g * size;
-		bottomHeight = bottom.g * size;	
+		VertexShininess = terrainShininess;	
 	}
 
-	newNormal = vec3(leftHeight - rightHeight, 2 * texelSize.x, bottomHeight - topHeight);
+	newNormal = vec3(Height(left) - Height(right), 2 * texelSize.x, Height(bottom) - Height(top));
 	newNormal = normalize(newNormal);
 
     gl_Position = projection * view * model * vec4(newPosition, 1.0);

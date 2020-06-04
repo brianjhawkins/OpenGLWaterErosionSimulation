@@ -50,6 +50,11 @@ void main()
 	vec4 columnData = imageLoad(CD_image, pixelCoords);
 
 	float newWaterHeight = 0;
+	float newTerrainHeight;
+	float newRegolithHeight;
+
+	float Km = 0.1f;
+
 	float sourceIncrementValue = 0;
 	float rainIncrementValue = 0;
 
@@ -73,5 +78,18 @@ void main()
 
 	newWaterHeight = columnData.r + sourceIncrementValue + rainIncrementValue;
 
-	imageStore(image_output, pixelCoords, vec4(newWaterHeight, columnData.g, columnData.b, columnData.a));
+	newTerrainHeight = columnData.g + columnData.a;
+
+	if(newWaterHeight < Km){
+		newRegolithHeight = newWaterHeight;
+	}
+	else{
+		newRegolithHeight = Km;		
+	}
+
+	newRegolithHeight = Km;
+
+	newTerrainHeight -= newRegolithHeight;
+
+	imageStore(image_output, pixelCoords, vec4(newWaterHeight, newTerrainHeight, columnData.b, newRegolithHeight));
 }
