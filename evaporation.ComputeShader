@@ -1,9 +1,11 @@
 #version 460 core
 layout(local_size_x = 32, local_size_y = 32) in;
 
-layout(rgba32f, binding = 0) uniform image2D image_output;
+layout(rgba32f, binding = 0) uniform image2D columndata_image_output;
 
 layout(rgba32f, binding = 1) uniform image2D CD_image;
+
+layout(rgba32f, binding = 2) uniform image2D W_image;
 
 uniform float timeStep;
 
@@ -11,19 +13,20 @@ void main()
 {    
 	ivec2 pixelCoords = ivec2(gl_GlobalInvocationID.xy);
 
-	vec2 imageSize = imageSize(image_output);
+	vec2 imageSize = imageSize(columndata_image_output);
     
 	vec4 columnData = imageLoad(CD_image, pixelCoords);
+	float moistureValue = imageLoad(W_image, pixelCoords).a;
 
 	float newWaterHeight;
 
 	// Evaporation constant
-	float Ke = 1 * (1 + columnData.a);
+	float Ke = 1 * (1 + moistureValue);
 
 	newWaterHeight = columnData.r * (1 - Ke * timeStep);
 	if(newWaterHeight < 0.0001f){
 		newWaterHeight = 0;
 	}
 
-	imageStore(image_output, pixelCoords, vec4(newWaterHeight, columnData.g, columnData.b, columnData.a));
+	imageStore(columndata_image_output, pixelCoords, vec4(newWaterHeight, columnData.g, columnData.b, columnData.a));
 }

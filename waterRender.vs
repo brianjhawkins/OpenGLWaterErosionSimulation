@@ -24,15 +24,16 @@ out vec2 TexCoords;
 out vec3 VertexColor;
 out vec3 VertexSpecularColor;
 out float VertexShininess;
+out float Opacity;
 
 float Height(vec4 v){
-	return (v.g + v.b + v.a) * size;
+	return (v.r + v.g + v.b + v.a) * size;
 }
 
 void main()
 {
 	vec4 columnDataTextureValue = texture(columnDataTexture, aTexCoords);
-	float moistureValue = texture(waterDataTexture, aTexCoords).a;
+	vec4 waterDataTextureValue = texture(waterDataTexture, aTexCoords);
 	
 	vec3 newPosition = aPos;
 	float newY = Height(columnDataTextureValue);
@@ -46,13 +47,35 @@ void main()
 	vec4 top = textureOffset(columnDataTexture, aTexCoords, ivec2(0, 1));
 	vec4 bottom = textureOffset(columnDataTexture, aTexCoords, ivec2(0, -1));
 
-	vec3 tempTerrainColor = mix(terrainColor, vegetationColor, max(0, moistureValue * 5));
+	VertexColor = mix(waterColor, terrainColor, waterDataTextureValue.r * 10);
+	VertexSpecularColor = waterSpecularColor;
+	VertexShininess = waterShininess;
 
-	VertexColor = tempTerrainColor;
-	VertexSpecularColor = terrainSpecularColor;
-	VertexShininess = terrainShininess;
+	Opacity = mix(0.3f, 1.0f, waterDataTextureValue.r * 10);
 
-	newNormal = vec3(Height(left) - Height(right), 2 * texelSize.x, Height(bottom) - Height(top));
+	float centerHeight = Height(columnDataTextureValue);
+	float leftHeight = Height(left);
+	float rightHeight = Height(right);
+	float topHeight = Height(top);
+	float bottomHeight = Height(bottom);
+
+	if(left.r == 0){
+		leftHeight = centerHeight;
+	}
+
+	if(right.r == 0){
+		rightHeight = centerHeight;
+	}
+
+	if(top.r == 0){
+		topHeight = centerHeight;
+	}
+
+	if(bottom.r == 0){
+		bottomHeight = centerHeight;
+	}
+
+	newNormal = vec3(leftHeight - rightHeight, 2 * texelSize.x, bottomHeight - topHeight);
 	newNormal = normalize(newNormal);
 
     gl_Position = projection * view * model * vec4(newPosition, 1.0);

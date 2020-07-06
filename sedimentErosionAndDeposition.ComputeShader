@@ -1,27 +1,41 @@
 #version 460 core
 layout(local_size_x = 32, local_size_y = 32) in;
 
-layout(rgba32f, binding = 0) uniform image2D image_output;
+layout(rgba32f, binding = 0) uniform image2D CD_image_output;
 
-layout(rgba32f, binding = 1) uniform image2D CD_image;
+layout(rgba32f, binding = 1) uniform image2D W_image_output;
 
-layout(rgba32f, binding = 2) uniform image2D V_image;
+layout(rgba32f, binding = 2) uniform image2D CD_image;
+
+layout(rgba32f, binding = 3) uniform image2D W_image;
+
+layout(rgba32f, binding = 4) uniform image2D V_image;
+
+float Height(vec4 column){
+	return column.g + column.b + column.a;
+}
 
 void main()
 {    
 	ivec2 pixelCoords = ivec2(gl_GlobalInvocationID.xy);
 
-	vec2 imageSize = imageSize(image_output);
+	vec2 imageSize = imageSize(CD_image_output);
     ivec2 deltaX = ivec2(1, 0);
 	ivec2 deltaY = ivec2(0, 1);
 
 	vec4 centerColumn = imageLoad(CD_image, pixelCoords);
+	vec4 centerWater = imageLoad(W_image, pixelCoords);
 	vec4 centerVelocity = imageLoad(V_image, pixelCoords);
+
+	vec4 leftColumn = imageLoad(CD_image, pixelCoords - deltaX);
+	vec4 rightColumn = imageLoad(CD_image, pixelCoords + deltaX);
+	vec4 topColumn = imageLoad(CD_image, pixelCoords + deltaY);
+	vec4 bottomColumn = imageLoad(CD_image, pixelCoords - deltaY);
 
 	// Sediment Capacity constant
 	float Kc = 0.002f;
 	// Dissolving constant
-	float Ks = 0.003f * max(0, (1.0f - 2.0f * centerColumn.a));
+	float Ks = 0.003f * max(0, (1.0f - 2.0f * centerWater.a));
 	// Deposition constant
 	float Kd = 0.001f;
 
@@ -32,10 +46,12 @@ void main()
 	// Calculate normal of vector for current point
 	vec3 normal;
 	vec2 texelSize = vec2(1.0f / imageSize.x, 1.0f / imageSize.y);
-	float leftHeight = imageLoad(CD_image, pixelCoords - deltaX).g;
-	float rightHeight = imageLoad(CD_image, pixelCoords + deltaX).g;
-	float topHeight = imageLoad(CD_image, pixelCoords + deltaY).g;
-	float bottomHeight = imageLoad(CD_image, pixelCoords - deltaY).g;
+
+	float leftHeight = Height(leftColumn);
+	float rightHeight = Height(rightColumn);
+	float topHeight = Height(topColumn);
+	float bottomHeight = Height(bottomColumn);
+
 	normal = vec3(leftHeight - rightHeight, 2 * texelSize.x, bottomHeight - topHeight);
 	normal = normalize(normal);
 
@@ -49,16 +65,17 @@ void main()
 
 	// If sediment capacity of water is greater than current amount of sediment dissolved into water
 	// dissolve some more terrain into the water and adjust terrain height and sediment value accordingly
-	if(sedimentCapacity > centerColumn.b){
-		newTerrainHeight = centerColumn.g - Ks * (sedimentCapacity - centerColumn.b);
-		newSedimentValue = centerColumn.b + Ks * (sedimentCapacity - centerColumn.b);
+	if(sedimentCapacity > centerWater.r){
+		newTerrainHeight = centerColumn.a - Ks * (sedimentCapacity - centerWater.r);
+		newSedimentValue = centerWater.r + Ks * (sedimentCapacity - centerWater.r);
 	}
 	// If sediment capacity of water is not greater than current amount of sediment dissolved into water
 	// release some sediment back into the terrain and adjust terrain height and sediment value accordingly
 	else{
-		newTerrainHeight = centerColumn.g + Kd * (centerColumn.b - sedimentCapacity);
-		newSedimentValue = centerColumn.b - Kd * (centerColumn.b - sedimentCapacity);
+		newTerrainHeight = centerColumn.a + Kd * (centerWater.r - sedimentCapacity);
+		newSedimentValue = centerWater.r - Kd * (centerWater.r - sedimentCapacity);
 	}
 
-	imageStore(image_output, pixelCoords, vec4(centerColumn.r, newTerrainHeight, newSedimentValue, centerColumn.a));
+	imageStore(CD_image_output, pixelCoords, vec4(centerColumn.r, centerColumn.g, centerColumn.b, newTerrainHeight));
+	imageStore(W_image_output, pixelCoords, vec4(newSedimentValue, centerWater.g, centerWater.b, centerWater.a));
 }

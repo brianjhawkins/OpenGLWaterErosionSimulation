@@ -10,7 +10,7 @@ layout(rgba32f, binding = 2) uniform image2D R_image;
 uniform float timeStep;
 
 float heightDifference(vec4 center, vec4 adjacent){
-	return (center.a + center.g - adjacent.a - adjacent.g);
+	return (center.b + center.a - adjacent.b - adjacent.a);
 }
 
 void main()
@@ -31,42 +31,32 @@ void main()
 
 	float l = 1 / imageSize.x;
 	float volumeChange;
+	float heightChange;
 
 	float newRegolithHeight;
 	float newTerrainHeight;
 
-	if(pixelCoords.x == 0){
-		inLeft = 0;
-	}
-	else{
+	if(pixelCoords.x != 0){
 		inLeft = imageLoad(R_image, pixelCoords - deltaX).g;
 	}
 
-	if(pixelCoords.x == imageSize.x - 1){
-		inRight = 0;
-	}
-	else{
+	if(pixelCoords.x != imageSize.x - 1){
 		inRight = imageLoad(R_image, pixelCoords + deltaX).r;
 	}
 
-	if(pixelCoords.y == imageSize.y - 1){
-		inTop = 0;
-	}
-	else{
+	if(pixelCoords.y != imageSize.y - 1){
 		inTop = imageLoad(R_image, pixelCoords + deltaY).a;
 	}
 
-	if(pixelCoords.y == 0){
-		inBottom = 0;
-	}
-	else{
+	if(pixelCoords.y != 0){
 		inBottom = imageLoad(R_image, pixelCoords - deltaY).b;
 	}
 
 	volumeChange = timeStep * ((inLeft + inRight + inTop + inBottom) - (centerFlux.r + centerFlux.g + centerFlux.b + centerFlux.a));
 
-	newRegolithHeight = centerColumn.a + (volumeChange / (l * l));
-	newTerrainHeight = centerColumn.g - (volumeChange / (l * l));
+	heightChange = volumeChange / (l * l);
 
-	imageStore(image_output, pixelCoords, vec4(centerColumn.a, newTerrainHeight, centerColumn.b, newRegolithHeight));
+	newRegolithHeight = centerColumn.b + heightChange;
+
+	imageStore(image_output, pixelCoords, vec4(centerColumn.a, centerColumn.g, newRegolithHeight, centerColumn.a));
 }

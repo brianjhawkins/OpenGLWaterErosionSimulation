@@ -1,7 +1,7 @@
 #version 460 core
 layout(local_size_x = 32, local_size_y = 32) in;
 
-layout(rgba32f, binding = 0) uniform image2D image_output;
+layout(rgba32f, binding = 0) uniform image2D CD_image_output;
 
 layout(rgba32f, binding = 1) uniform image2D CD_image;
 
@@ -45,7 +45,7 @@ void main()
 {    
 	ivec2 pixelCoords = ivec2(gl_GlobalInvocationID.xy);
 
-	vec2 imageSize = imageSize(image_output);
+	vec2 imageSize = imageSize(CD_image_output);
     
 	vec4 columnData = imageLoad(CD_image, pixelCoords);
 
@@ -78,7 +78,7 @@ void main()
 
 	newWaterHeight = columnData.r + sourceIncrementValue + rainIncrementValue;
 
-	newTerrainHeight = columnData.g + columnData.a;
+	newTerrainHeight = columnData.b + columnData.a;
 
 	if(newWaterHeight < Km){
 		newRegolithHeight = newWaterHeight;
@@ -87,9 +87,7 @@ void main()
 		newRegolithHeight = Km;		
 	}
 
-	newRegolithHeight = Km;
-
 	newTerrainHeight -= newRegolithHeight;
 
-	imageStore(image_output, pixelCoords, vec4(newWaterHeight, newTerrainHeight, columnData.b, newRegolithHeight));
+	imageStore(CD_image_output, pixelCoords, vec4(newWaterHeight, columnData.g, newRegolithHeight, newTerrainHeight));
 }
