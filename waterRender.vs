@@ -27,7 +27,7 @@ out float VertexShininess;
 out float Opacity;
 
 float Height(vec4 v){
-	return (v.r + v.g + v.b + v.a) * size;
+	return (v.r + v.b + v.a) * size;
 }
 
 void main()

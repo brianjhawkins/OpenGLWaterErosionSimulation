@@ -12,6 +12,7 @@ uniform float size;
 
 uniform vec3 terrainColor;
 uniform vec3 vegetationColor;
+uniform vec3 deadVegetationColor;
 uniform vec3 waterColor;
 uniform vec3 terrainSpecularColor;
 uniform vec3 waterSpecularColor;
@@ -26,13 +27,13 @@ out vec3 VertexSpecularColor;
 out float VertexShininess;
 
 float Height(vec4 v){
-	return (v.g + v.b + v.a) * size;
+	return (v.b + v.a) * size;
 }
 
 void main()
 {
 	vec4 columnDataTextureValue = texture(columnDataTexture, aTexCoords);
-	float moistureValue = texture(waterDataTexture, aTexCoords).a;
+	vec4 waterDataTextureValue = texture(waterDataTexture, aTexCoords);
 	
 	vec3 newPosition = aPos;
 	float newY = Height(columnDataTextureValue);
@@ -46,7 +47,13 @@ void main()
 	vec4 top = textureOffset(columnDataTexture, aTexCoords, ivec2(0, 1));
 	vec4 bottom = textureOffset(columnDataTexture, aTexCoords, ivec2(0, -1));
 
-	vec3 tempTerrainColor = mix(terrainColor, vegetationColor, max(0, moistureValue * 5));
+	vec3 tempTerrainColor;
+	if(waterDataTextureValue.a >= 0){
+		tempTerrainColor = mix(terrainColor, vegetationColor, waterDataTextureValue.a * 5);
+	}
+	else{
+		tempTerrainColor = mix(terrainColor, deadVegetationColor, max(0, -waterDataTextureValue.a * 5));
+	}
 
 	VertexColor = tempTerrainColor;
 	VertexSpecularColor = terrainSpecularColor;

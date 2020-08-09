@@ -13,12 +13,20 @@ layout(rgba32f, binding = 4) uniform image2D R_image;
 
 uniform float timeStep;
 
+float waterHeight(vec4 v){
+	return v.r + v.b + v.a;
+}
+
+float regolithHeight(vec4 v){
+	return v.b + v.a;
+}
+
 float waterHeightDifference(vec4 center, vec4 adjacent){
-	return max(center.g + center.b + center.a, adjacent.r + adjacent.g + adjacent.b + adjacent.a) - (center.r + center.g + center.b + center.a);
+	return waterHeight(center) - waterHeight(adjacent);
 }
 
 float regolithHeightDifference(vec4 center, vec4 adjacent){
-	return max(center.a, adjacent.b + adjacent.a) - (center.b + center.a);
+	return regolithHeight(center) - regolithHeight(adjacent);
 }
 
 void main()
@@ -54,10 +62,10 @@ void main()
 
 	float l = 1 / imageSize.x;
 	float A = l * l;
-	float g = -imageSize.x / 2;
+	float g = imageSize.x / 2;
 	float wKf = 0.999f;
 	//wKf = 1;
-	float rKf = 0.8f;
+	float rKf = 0.3f;
 	//rKf = 0;
 	
 	// Left Flux

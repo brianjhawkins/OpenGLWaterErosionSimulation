@@ -3,7 +3,11 @@ layout(local_size_x = 32, local_size_y = 32) in;
 
 layout(rgba32f, binding = 0) uniform image2D CD_image_output;
 
-layout(rgba32f, binding = 1) uniform image2D CD_image;
+layout(rgba32f, binding = 1) uniform image2D W_image_output;
+
+layout(rgba32f, binding = 2) uniform image2D CD_image;
+
+layout(rgba32f, binding = 3) uniform image2D W_image;
 
 struct Source{
 	ivec2 position;
@@ -48,12 +52,16 @@ void main()
 	vec2 imageSize = imageSize(CD_image_output);
     
 	vec4 columnData = imageLoad(CD_image, pixelCoords);
+	vec4 waterData = imageLoad(W_image, pixelCoords);
 
 	float newWaterHeight = 0;
 	float newTerrainHeight;
-	float newRegolithHeight;
+	float newRegolithHeight = 0;
+	float newTimeCovered = 0;
+	float newMoistureValue = waterData.a;
+	float newDeadVegetationValue = columnData.g;
 
-	float Km = 0.1f;
+	float Km = 0.00001f;
 
 	float sourceIncrementValue = 0;
 	float rainIncrementValue = 0;
@@ -80,14 +88,27 @@ void main()
 
 	newTerrainHeight = columnData.b + columnData.a;
 
+	if(newWaterHeight > 0){
+		newTimeCovered = min(2, waterData.b + timeStep);
+	}
+	else{
+		newTimeCovered = max(0, waterData.b - timeStep);
+	}
+
 	if(newWaterHeight < Km){
 		newRegolithHeight = newWaterHeight;
 	}
 	else{
-		newRegolithHeight = Km;		
+		newRegolithHeight = Km;
+	}
+
+	if(newTimeCovered > 1 && newMoistureValue > 0){
+		//newDeadVegetationValue = newMoistureValue;
+		newMoistureValue = -newMoistureValue;
 	}
 
 	newTerrainHeight -= newRegolithHeight;
 
-	imageStore(CD_image_output, pixelCoords, vec4(newWaterHeight, columnData.g, newRegolithHeight, newTerrainHeight));
+	imageStore(CD_image_output, pixelCoords, vec4(newWaterHeight, newDeadVegetationValue, newRegolithHeight, newTerrainHeight));
+	imageStore(W_image_output, pixelCoords, vec4(waterData.r, waterData.g, newTimeCovered, newMoistureValue));
 }
