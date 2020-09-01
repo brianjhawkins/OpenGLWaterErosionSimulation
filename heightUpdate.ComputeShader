@@ -9,17 +9,19 @@ layout(rgba32f, binding = 2) uniform image2D F_image;
 
 layout(rgba32f, binding = 3) uniform image2D R_image;
 
+uniform float pipeLength;
+uniform float width;
+uniform float height;
 uniform float timeStep;
 
 void main()
 {    
 	ivec2 pixelCoords = ivec2(gl_GlobalInvocationID.xy);
 
-	vec2 imageSize = imageSize(CD_image_output);
     ivec2 deltaX = ivec2(1, 0);
 	ivec2 deltaY = ivec2(0, 1);
 
-	vec4 centerColumn = imageLoad(CD_image, pixelCoords);
+	vec4 centerColumnData = imageLoad(CD_image, pixelCoords);
 	vec4 centerWaterFlux = imageLoad(F_image, pixelCoords);
 	vec4 centerRegolithFlux = imageLoad(R_image, pixelCoords);
 
@@ -35,24 +37,23 @@ void main()
 	float regolithInTop = 0;
 	float regolithInBottom = 0;
 
-	float l = 1 / imageSize.x;
 	float waterVolumeChange;
 	float regolithVolumeChange;
 
-	float newWaterHeight;
-	float newRegolithHeight;
+	float newWaterHeight = centerColumnData.r;
+	float newRegolithHeight = centerColumnData.g;
 
 	if(pixelCoords.x != 0){
 		waterInLeft = imageLoad(F_image, pixelCoords - deltaX).g;
 		regolithInLeft = imageLoad(R_image, pixelCoords - deltaX).g;
 	}
 
-	if(pixelCoords.x != imageSize.x - 1){
+	if(pixelCoords.x != width - 1){
 		waterInRight = imageLoad(F_image, pixelCoords + deltaX).r;
 		regolithInRight = imageLoad(R_image, pixelCoords + deltaX).r;
 	}
 
-	if(pixelCoords.y != imageSize.y - 1){
+	if(pixelCoords.y != height - 1){
 		waterInTop = imageLoad(F_image, pixelCoords + deltaY).a;
 		regolithInTop = imageLoad(R_image, pixelCoords + deltaY).a;
 	}
@@ -65,8 +66,8 @@ void main()
 	waterVolumeChange = timeStep * ((waterInLeft + waterInRight + waterInTop + waterInBottom) - (centerWaterFlux.r + centerWaterFlux.g + centerWaterFlux.b + centerWaterFlux.a));
 	regolithVolumeChange = timeStep * ((regolithInLeft + regolithInRight + regolithInTop + regolithInBottom) - (centerRegolithFlux.r + centerRegolithFlux.g + centerRegolithFlux.b + centerRegolithFlux.a));
 
-	newWaterHeight = centerColumn.r + (waterVolumeChange / (l * l));
-	newRegolithHeight = centerColumn.b + (regolithVolumeChange / (l * l));
+	newWaterHeight += (waterVolumeChange / (pipeLength * pipeLength));
+	newRegolithHeight += (regolithVolumeChange / (pipeLength * pipeLength));
 
-	imageStore(CD_image_output, pixelCoords, vec4(newWaterHeight, centerColumn.g, newRegolithHeight, centerColumn.a));
+	imageStore(CD_image_output, pixelCoords, vec4(newWaterHeight, newRegolithHeight, centerColumnData.b, centerColumnData.a));
 }

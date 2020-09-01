@@ -7,6 +7,8 @@ layout(rgba32f, binding = 1) uniform image2D W_image;
 
 layout(rgba32f, binding = 2) uniform image2D V_image;
 
+uniform float width;
+uniform float height;
 uniform float timeStep;
 
 float LinearInterpolation(float xCoordinate, float yCoordinate, ivec2 bL, ivec2 bR, ivec2 tL, ivec2 tR, vec4 sedimentValues){
@@ -20,7 +22,6 @@ void main()
 {    
 	ivec2 pixelCoords = ivec2(gl_GlobalInvocationID.xy);
 
-	vec2 imageSize = imageSize(W_image_output);
     ivec2 deltaX = ivec2(1, 0);
 	ivec2 deltaY = ivec2(0, 1);
 
@@ -28,15 +29,12 @@ void main()
 	vec4 centerVelocity = imageLoad(V_image, pixelCoords);
 
 	float newSedimentValue;
-	float newDeadPlantSedimentValue;
+	float newDeadVegetationSedimentValue;
 
 	// Use backtracking to calculate advection values
 	// Determine where the sediment that should be in this point was last timestep
-	float xCoordinate = (pixelCoords.x / imageSize.x) - (centerVelocity.r * timeStep);
-	float yCoordinate = (pixelCoords.y / imageSize.y) - (centerVelocity.g * timeStep);
-
-	float width = imageSize.x;
-	float height = imageSize.y;
+	float xCoordinate = (pixelCoords.x / width) - (centerVelocity.r * timeStep);
+	float yCoordinate = (pixelCoords.y / height) - (centerVelocity.g * timeStep);
 
 	xCoordinate *= width;
 	yCoordinate *= height;
@@ -49,7 +47,7 @@ void main()
 	// If it is on the grid, simply find its sediment value and return it
 	if(xCoordinate == nearestPreviousX && yCoordinate == nearestPreviousY){
 		newSedimentValue = imageLoad(W_image, ivec2(xCoordinate, yCoordinate)).r;
-		newDeadPlantSedimentValue = imageLoad(W_image, ivec2(xCoordinate, yCoordinate)).g;
+		newDeadVegetationSedimentValue = imageLoad(W_image, ivec2(xCoordinate, yCoordinate)).g;
 	}
 	// If it is not on the grid, use bilinear interpolation between the 4 nearest points on the grid
 	else{
@@ -65,16 +63,16 @@ void main()
 
 		vec4 sedimentValues = vec4(bottomLeftSediment, bottomRightSediment, topLeftSediment, topRightSediment);
 
-		float bottomLeftDeadPlantSediment = imageLoad(W_image, bottomLeft).g;
-		float bottomRightDeadPlantSediment = imageLoad(W_image, bottomRight).g;
-		float topLeftDeadPlantSediment = imageLoad(W_image, topLeft).g;
-		float topRightDeadPlantSediment = imageLoad(W_image, topRight).g;
+		float bottomLeftDeadVegetationSediment = imageLoad(W_image, bottomLeft).g;
+		float bottomRightDeadVegetationSediment = imageLoad(W_image, bottomRight).g;
+		float topLeftDeadVegetationSediment = imageLoad(W_image, topLeft).g;
+		float topRightDeadVegetationSediment = imageLoad(W_image, topRight).g;
 
-		vec4 deadPlantSedimentValues = vec4(bottomLeftDeadPlantSediment, bottomRightDeadPlantSediment, topLeftDeadPlantSediment, topRightDeadPlantSediment);
+		vec4 DeadVegetationSedimentValues = vec4(bottomLeftDeadVegetationSediment, bottomRightDeadVegetationSediment, topLeftDeadVegetationSediment, topRightDeadVegetationSediment);
 
 		newSedimentValue = LinearInterpolation(xCoordinate, yCoordinate, bottomLeft, bottomRight, topLeft, topRight, sedimentValues);
-		newDeadPlantSedimentValue = LinearInterpolation(xCoordinate, yCoordinate, bottomLeft, bottomRight, topLeft, topRight, deadPlantSedimentValues);
+		newDeadVegetationSedimentValue = LinearInterpolation(xCoordinate, yCoordinate, bottomLeft, bottomRight, topLeft, topRight, DeadVegetationSedimentValues);
 	}
 
-	imageStore(W_image_output, pixelCoords, vec4(newSedimentValue, newDeadPlantSedimentValue, waterData.b, waterData.a));
+	imageStore(W_image_output, pixelCoords, vec4(newSedimentValue, newDeadVegetationSedimentValue, waterData.b, waterData.a));
 }

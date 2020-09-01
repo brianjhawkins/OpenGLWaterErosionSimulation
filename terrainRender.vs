@@ -26,8 +26,8 @@ out vec3 VertexColor;
 out vec3 VertexSpecularColor;
 out float VertexShininess;
 
-float Height(vec4 v){
-	return (v.b + v.a) * size;
+float Height(vec4 c, vec4 w){
+	return (c.g + w.a + c.b + c.a) * size;
 }
 
 void main()
@@ -36,30 +36,35 @@ void main()
 	vec4 waterDataTextureValue = texture(waterDataTexture, aTexCoords);
 	
 	vec3 newPosition = aPos;
-	float newY = Height(columnDataTextureValue);
+	float newY = Height(columnDataTextureValue, waterDataTextureValue);
 	newPosition.y = newY;
 	
 	vec3 newNormal;
 	vec2 textureSize = textureSize(columnDataTexture, 0);
 	vec2 texelSize = vec2(1.0f / textureSize.x, 1.0f / textureSize.y);
-	vec4 left = textureOffset(columnDataTexture, aTexCoords, ivec2(-1, 0));
-	vec4 right = textureOffset(columnDataTexture, aTexCoords, ivec2(1, 0));
-	vec4 top = textureOffset(columnDataTexture, aTexCoords, ivec2(0, 1));
-	vec4 bottom = textureOffset(columnDataTexture, aTexCoords, ivec2(0, -1));
+	vec4 leftColumnData = textureOffset(columnDataTexture, aTexCoords, ivec2(-1, 0));
+	vec4 leftWaterData = textureOffset(waterDataTexture, aTexCoords, ivec2(-1, 0));
+	vec4 rightColumnData = textureOffset(columnDataTexture, aTexCoords, ivec2(1, 0));
+	vec4 rightWaterData = textureOffset(waterDataTexture, aTexCoords, ivec2(1, 0));
+	vec4 topColumnData = textureOffset(columnDataTexture, aTexCoords, ivec2(0, 1));
+	vec4 topWaterData = textureOffset(waterDataTexture, aTexCoords, ivec2(0, 1));
+	vec4 bottomColumnData = textureOffset(columnDataTexture, aTexCoords, ivec2(0, -1));
+	vec4 bottomWaterData = textureOffset(waterDataTexture, aTexCoords, ivec2(0, -1));
 
-	vec3 tempTerrainColor;
-	if(waterDataTextureValue.a >= 0){
-		tempTerrainColor = mix(terrainColor, vegetationColor, waterDataTextureValue.a * 5);
+	vec3 tempTerrainColor = terrainColor;
+	if(columnDataTextureValue.b > 0){
+		tempTerrainColor = mix(tempTerrainColor, vegetationColor, columnDataTextureValue.b * 5);
 	}
-	else{
-		tempTerrainColor = mix(terrainColor, deadVegetationColor, max(0, -waterDataTextureValue.a * 5));
+
+	if(waterDataTextureValue.a > 0){
+		tempTerrainColor = mix(tempTerrainColor, deadVegetationColor, waterDataTextureValue.a * 5);
 	}
 
 	VertexColor = tempTerrainColor;
 	VertexSpecularColor = terrainSpecularColor;
 	VertexShininess = terrainShininess;
 
-	newNormal = vec3(Height(left) - Height(right), 2 * texelSize.x, Height(bottom) - Height(top));
+	newNormal = vec3(Height(leftColumnData, leftWaterData) - Height(rightColumnData, rightWaterData), 2 * texelSize.x, Height(bottomColumnData, bottomWaterData) - Height(topColumnData, topWaterData));
 	newNormal = normalize(newNormal);
 
     gl_Position = projection * view * model * vec4(newPosition, 1.0);

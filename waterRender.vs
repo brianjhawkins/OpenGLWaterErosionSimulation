@@ -26,8 +26,8 @@ out vec3 VertexSpecularColor;
 out float VertexShininess;
 out float Opacity;
 
-float Height(vec4 v){
-	return (v.r + v.b + v.a) * size;
+float Height(vec4 c, vec4 w){
+	return (c.r + c.g + w.a + c.b + c.a) * size;
 }
 
 void main()
@@ -36,42 +36,46 @@ void main()
 	vec4 waterDataTextureValue = texture(waterDataTexture, aTexCoords);
 	
 	vec3 newPosition = aPos;
-	float newY = Height(columnDataTextureValue);
+	float newY = Height(columnDataTextureValue, waterDataTextureValue);
 	newPosition.y = newY;
 	
 	vec3 newNormal;
 	vec2 textureSize = textureSize(columnDataTexture, 0);
 	vec2 texelSize = vec2(1.0f / textureSize.x, 1.0f / textureSize.y);
-	vec4 left = textureOffset(columnDataTexture, aTexCoords, ivec2(-1, 0));
-	vec4 right = textureOffset(columnDataTexture, aTexCoords, ivec2(1, 0));
-	vec4 top = textureOffset(columnDataTexture, aTexCoords, ivec2(0, 1));
-	vec4 bottom = textureOffset(columnDataTexture, aTexCoords, ivec2(0, -1));
+	vec4 leftColumnData = textureOffset(columnDataTexture, aTexCoords, ivec2(-1, 0));
+	vec4 leftWaterData = textureOffset(waterDataTexture, aTexCoords, ivec2(-1, 0));
+	vec4 rightColumnData = textureOffset(columnDataTexture, aTexCoords, ivec2(1, 0));
+	vec4 rightWaterData = textureOffset(waterDataTexture, aTexCoords, ivec2(1, 0));
+	vec4 topColumnData = textureOffset(columnDataTexture, aTexCoords, ivec2(0, 1));
+	vec4 topWaterData = textureOffset(waterDataTexture, aTexCoords, ivec2(0, 1));
+	vec4 bottomColumnData = textureOffset(columnDataTexture, aTexCoords, ivec2(0, -1));
+	vec4 bottomWaterData = textureOffset(waterDataTexture, aTexCoords, ivec2(0, -1));
 
 	VertexColor = mix(waterColor, terrainColor, waterDataTextureValue.r * 10);
 	VertexSpecularColor = waterSpecularColor;
 	VertexShininess = waterShininess;
 
-	Opacity = mix(0.3f, 1.0f, waterDataTextureValue.r * 10);
+	Opacity = mix(0.3f, 1.0f, (waterDataTextureValue.r + waterDataTextureValue.g) * 10);
 
-	float centerHeight = Height(columnDataTextureValue);
-	float leftHeight = Height(left);
-	float rightHeight = Height(right);
-	float topHeight = Height(top);
-	float bottomHeight = Height(bottom);
+	float centerHeight = newY;
+	float leftHeight = Height(leftColumnData, leftWaterData);
+	float rightHeight = Height(rightColumnData, rightWaterData);
+	float topHeight = Height(topColumnData, topWaterData);
+	float bottomHeight = Height(bottomColumnData, bottomWaterData);
 
-	if(left.r == 0){
+	if(leftColumnData.r == 0){
 		leftHeight = centerHeight;
 	}
 
-	if(right.r == 0){
+	if(rightColumnData.r == 0){
 		rightHeight = centerHeight;
 	}
 
-	if(top.r == 0){
+	if(topColumnData.r == 0){
 		topHeight = centerHeight;
 	}
 
-	if(bottom.r == 0){
+	if(bottomColumnData.r == 0){
 		bottomHeight = centerHeight;
 	}
 

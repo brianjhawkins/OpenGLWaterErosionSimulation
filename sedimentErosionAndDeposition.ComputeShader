@@ -11,12 +11,21 @@ layout(rgba32f, binding = 3) uniform image2D W_image;
 
 layout(rgba32f, binding = 4) uniform image2D V_image;
 
-float Height(vec4 column){
-	return column.b + column.a;
+uniform float Kdmax;
+// Sediment capacity constant
+uniform float Kc;
+// Sediment dissolving constant
+uniform float dissolvingConstant;
+// Sediment deposition constant
+uniform float Kd;
+uniform float width;
+uniform float height;
+
+float Height(vec4 c, vec4 w){
+	return c.g + w.a + c.b + c.a;
 }
 
 float ErosionRamp(float d){
-	float Kdmax = 0.0001f;
 	float rampScale;
 	
 	if(d <= 0){
@@ -40,41 +49,41 @@ void main()
 {    
 	ivec2 pixelCoords = ivec2(gl_GlobalInvocationID.xy);
 
-	vec2 imageSize = imageSize(CD_image_output);
     ivec2 deltaX = ivec2(1, 0);
 	ivec2 deltaY = ivec2(0, 1);
 
-	vec4 centerColumn = imageLoad(CD_image, pixelCoords);
-	vec4 centerWater = imageLoad(W_image, pixelCoords);
+	vec4 centerColumnData = imageLoad(CD_image, pixelCoords);
+	vec4 centerWaterData = imageLoad(W_image, pixelCoords);
 	vec4 centerVelocity = imageLoad(V_image, pixelCoords);
 
-	vec4 leftColumn = imageLoad(CD_image, pixelCoords - deltaX);
-	vec4 rightColumn = imageLoad(CD_image, pixelCoords + deltaX);
-	vec4 topColumn = imageLoad(CD_image, pixelCoords + deltaY);
-	vec4 bottomColumn = imageLoad(CD_image, pixelCoords - deltaY);
-
-	// Sediment Capacity constant
-	float Kc = 0.003f;
+	vec4 leftColumnData = imageLoad(CD_image, pixelCoords - deltaX);
+	vec4 leftWaterData = imageLoad(W_image, pixelCoords - deltaX);
+	vec4 rightColumnData = imageLoad(CD_image, pixelCoords + deltaX);
+	vec4 rightWaterData = imageLoad(W_image, pixelCoords + deltaX);
+	vec4 topColumnData = imageLoad(CD_image, pixelCoords + deltaY);
+	vec4 topWaterData = imageLoad(W_image, pixelCoords + deltaY);
+	vec4 bottomColumnData = imageLoad(CD_image, pixelCoords - deltaY);
+	vec4 bottomWaterData = imageLoad(W_image, pixelCoords - deltaY);
+	
 	// Dissolving constant
-	float Ks = 0.001f * max(0, (1.0f - 2.0f * max(0, centerWater.a)));
-	// Deposition constant
-	float Kd = 0.001f;
+	float Ks = dissolvingConstant * max(0, (1.0f - 2.0f * centerColumnData.b));
 
-	float newWaterHeight;
-	float newTerrainHeight;
-	float newDeadPlantValue;
-	float newSedimentValue;
-	float newDeadPlantSedimentValue;
+	float newWaterHeight = centerColumnData.r;
+	float newTerrainHeight = centerColumnData.a;
+	float newSedimentValue = centerWaterData.r;
+	float newDeadVegetationSedimentValue = centerWaterData.g;
+	float newDeadVegetationHeight = centerWaterData.a;
+
 	float localTiltAngle;
 
 	// Calculate normal of vector for current point
 	vec3 normal;
-	vec2 texelSize = vec2(1.0f / imageSize.x, 1.0f / imageSize.y);
+	vec2 texelSize = vec2(1.0f / width, 1.0f / height);
 
-	float leftHeight = Height(leftColumn);
-	float rightHeight = Height(rightColumn);
-	float topHeight = Height(topColumn);
-	float bottomHeight = Height(bottomColumn);
+	float leftHeight = Height(leftColumnData, leftWaterData);
+	float rightHeight = Height(rightColumnData, rightWaterData);
+	float topHeight = Height(topColumnData, topWaterData);
+	float bottomHeight = Height(bottomColumnData, bottomWaterData);
 
 	normal = vec3(leftHeight - rightHeight, 2 * texelSize.x, bottomHeight - topHeight);
 	normal = normalize(normal);
@@ -85,48 +94,48 @@ void main()
 	// Should be a value between -1 and 1, otherwise acos is undefined for it
 	localTiltAngle = acos(dot(flatNormal, normal));
 
-	float sedimentCapacity = Kc * sin(localTiltAngle) * length(centerVelocity.rg) * ErosionRamp(centerColumn.r);
+	float sedimentCapacity = Kc * sin(localTiltAngle) * length(centerVelocity.rg) * ErosionRamp(centerColumnData.r);
 
 	// If sediment capacity of water is greater than current amount of sediment dissolved into water
 	// dissolve some more terrain into the water and adjust terrain height and sediment value accordingly
 	float sedimentChangeAmount;
-	if(sedimentCapacity > SedimentValue(centerWater)){
-		sedimentChangeAmount = Ks * (sedimentCapacity - SedimentValue(centerWater));
-		newWaterHeight = centerColumn.r + sedimentChangeAmount;
+	if(sedimentCapacity > SedimentValue(centerWaterData)){
+		sedimentChangeAmount = Ks * (sedimentCapacity - SedimentValue(centerWaterData));
+		newWaterHeight += sedimentChangeAmount;
 
-		if(centerColumn.g >= (sedimentChangeAmount / 2)){
-			newDeadPlantValue = centerColumn.g - (sedimentChangeAmount / 2);
-			newTerrainHeight = centerColumn.a - (sedimentChangeAmount / 2);
-			newSedimentValue = centerWater.r + (sedimentChangeAmount / 2);
-			newDeadPlantSedimentValue = centerWater.g + (sedimentChangeAmount / 2);
+		if(newDeadVegetationHeight >= (sedimentChangeAmount / 2)){
+			newDeadVegetationHeight -= (sedimentChangeAmount / 2);
+			newTerrainHeight -= (sedimentChangeAmount / 2);
+			newSedimentValue += (sedimentChangeAmount / 2);
+			newDeadVegetationSedimentValue += (sedimentChangeAmount / 2);
 		}
 		else{
-			newDeadPlantValue = 0;
-			newTerrainHeight = centerColumn.a - (sedimentChangeAmount - centerColumn.g);
-			newSedimentValue = centerWater.r + (sedimentChangeAmount - centerColumn.g);
-			newDeadPlantSedimentValue = centerWater.g + centerColumn.g;
+			newDeadVegetationSedimentValue += newDeadVegetationHeight;
+			newTerrainHeight -= (sedimentChangeAmount - newDeadVegetationHeight);
+			newSedimentValue += (sedimentChangeAmount - newDeadVegetationHeight);
+			newDeadVegetationHeight = 0;
 		}
 	}
 	// If sediment capacity of water is not greater than current amount of sediment dissolved into water
 	// release some sediment back into the terrain and adjust terrain height and sediment value accordingly
 	else{
-		sedimentChangeAmount = Kd * (SedimentValue(centerWater) - sedimentCapacity);
-		newWaterHeight = centerColumn.r - sedimentChangeAmount;
+		sedimentChangeAmount = Kd * (SedimentValue(centerWaterData) - sedimentCapacity);
+		newWaterHeight -= sedimentChangeAmount;
 
-		if(centerWater.g >= (sedimentChangeAmount / 2)){
-			newDeadPlantValue = centerColumn.g + (sedimentChangeAmount / 2);
-			newTerrainHeight = centerColumn.a + (sedimentChangeAmount / 2);
-			newSedimentValue = centerWater.r - (sedimentChangeAmount / 2);
-			newDeadPlantSedimentValue = centerWater.g - (sedimentChangeAmount / 2);
+		if(newDeadVegetationSedimentValue >= (sedimentChangeAmount / 2)){
+			newDeadVegetationHeight += (sedimentChangeAmount / 2);
+			newTerrainHeight += (sedimentChangeAmount / 2);
+			newSedimentValue -= (sedimentChangeAmount / 2);
+			newDeadVegetationSedimentValue -= (sedimentChangeAmount / 2);
 		}
 		else{
-			newDeadPlantValue = centerWater.g;
-			newTerrainHeight = centerColumn.a + (sedimentChangeAmount - centerColumn.g);
-			newSedimentValue = centerWater.r - (sedimentChangeAmount - centerColumn.g);
-			newDeadPlantSedimentValue = 0;
+			newDeadVegetationHeight += newDeadVegetationSedimentValue;
+			newTerrainHeight += (sedimentChangeAmount - newDeadVegetationSedimentValue);
+			newSedimentValue -= (sedimentChangeAmount - newDeadVegetationSedimentValue);
+			newDeadVegetationSedimentValue = 0;
 		}
 	}
 
-	imageStore(CD_image_output, pixelCoords, vec4(newWaterHeight, newDeadPlantValue, centerColumn.b, newTerrainHeight));
-	imageStore(W_image_output, pixelCoords, vec4(newSedimentValue, newDeadPlantSedimentValue, centerWater.b, centerWater.a));
+	imageStore(CD_image_output, pixelCoords, vec4(newWaterHeight, centerColumnData.g, centerColumnData.b, newTerrainHeight));
+	imageStore(W_image_output, pixelCoords, vec4(newSedimentValue, newDeadVegetationSedimentValue, centerWaterData.b, newDeadVegetationHeight));
 }
