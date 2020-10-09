@@ -18,16 +18,17 @@ uniform float wKf;
 uniform float rKf;
 uniform float g;
 uniform float pipeLength;
+uniform float pipeArea;
 uniform float width;
 uniform float height;
 uniform float timeStep;
 
 float regolithHeight(vec4 c, vec4 w){
-	return c.g + w.a + c.b + c.a;
+	return (c.g + w.a + c.b + c.a) * 256;
 }
 
 float waterHeight(vec4 c, vec4 w){
-	return c.r + regolithHeight(c, w);
+	return (c.r) * 256 + regolithHeight(c, w);
 }
 
 float waterHeightDifference(vec4 centerColumn, vec4 centerWater, vec4 adjacentColumn, vec4 adjacentWater){
@@ -72,31 +73,29 @@ void main()
 	float bottomRegolithFlux = 0;
 
 	float K;
-
-	float A = pipeLength * pipeLength;
 	
 	// Left Flux
 	if(pixelCoords.x != 0){
-		leftWaterFlux = max(0, wKf * centerWaterFlux.r + (timeStep * A * (g * waterHeightDifference(centerColumnData, centerWaterData, leftColumnData, leftWaterData) / pipeLength)));
-		leftRegolithFlux = max(0, rKf * centerRegolithFlux.r + (timeStep * A * (g * regolithHeightDifference(centerColumnData, centerWaterData, leftColumnData, leftWaterData) / pipeLength)));
+		leftWaterFlux = max(0, wKf * centerWaterFlux.r + (timeStep * pipeArea * (g * waterHeightDifference(centerColumnData, centerWaterData, leftColumnData, leftWaterData) / pipeLength)));
+		leftRegolithFlux = max(0, rKf * centerRegolithFlux.r + (timeStep * pipeArea * (g * regolithHeightDifference(centerColumnData, centerWaterData, leftColumnData, leftWaterData) / pipeLength)));
 	}
 
 	// Right Flux
 	if(pixelCoords.x != width - 1){
-		rightWaterFlux = max(0, wKf * centerWaterFlux.g + (timeStep * A * (g * waterHeightDifference(centerColumnData, centerWaterData, rightColumnData, rightWaterData) / pipeLength)));
-		rightRegolithFlux = max(0, rKf * centerRegolithFlux.g + (timeStep * A * (g * regolithHeightDifference(centerColumnData, centerWaterData, rightColumnData, rightWaterData) / pipeLength)));
+		rightWaterFlux = max(0, wKf * centerWaterFlux.g + (timeStep * pipeArea * (g * waterHeightDifference(centerColumnData, centerWaterData, rightColumnData, rightWaterData) / pipeLength)));
+		rightRegolithFlux = max(0, rKf * centerRegolithFlux.g + (timeStep * pipeArea * (g * regolithHeightDifference(centerColumnData, centerWaterData, rightColumnData, rightWaterData) / pipeLength)));
 	}
 
 	// Top Flux
 	if(pixelCoords.y != height - 1){
-		topWaterFlux = max(0, wKf * centerWaterFlux.b + (timeStep * A * (g * waterHeightDifference(centerColumnData, centerWaterData, topColumnData, topWaterData) / pipeLength)));
-		topRegolithFlux = max(0, rKf * centerRegolithFlux.b + (timeStep * A * (g * regolithHeightDifference(centerColumnData, centerWaterData, topColumnData, topWaterData) / pipeLength)));
+		topWaterFlux = max(0, wKf * centerWaterFlux.b + (timeStep * pipeArea * (g * waterHeightDifference(centerColumnData, centerWaterData, topColumnData, topWaterData) / pipeLength)));
+		topRegolithFlux = max(0, rKf * centerRegolithFlux.b + (timeStep * pipeArea * (g * regolithHeightDifference(centerColumnData, centerWaterData, topColumnData, topWaterData) / pipeLength)));
 	}
 
 	// Bottom Flux
 	if(pixelCoords.y != 0){
-		bottomWaterFlux = max(0, wKf * centerWaterFlux.a + (timeStep * A * (g * waterHeightDifference(centerColumnData, centerWaterData, bottomColumnData, bottomWaterData) / pipeLength)));
-		bottomRegolithFlux = max(0, rKf * centerRegolithFlux.a + (timeStep * A * (g * regolithHeightDifference(centerColumnData, centerWaterData, bottomColumnData, bottomWaterData) / pipeLength)));
+		bottomWaterFlux = max(0, wKf * centerWaterFlux.a + (timeStep * pipeArea * (g * waterHeightDifference(centerColumnData, centerWaterData, bottomColumnData, bottomWaterData) / pipeLength)));
+		bottomRegolithFlux = max(0, rKf * centerRegolithFlux.a + (timeStep * pipeArea * (g * regolithHeightDifference(centerColumnData, centerWaterData, bottomColumnData, bottomWaterData) / pipeLength)));
 	}
 
 	// Scaling Factor K

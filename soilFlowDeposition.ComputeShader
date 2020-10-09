@@ -45,22 +45,22 @@ void main()
 
 	// Bottom left inflow soil
 	if(pixelCoords.x != 0 && pixelCoords.y != 0){
-		newTerrainValue += imageLoad(S_image, pixelCoords - deltaX - deltaY).a;
+		newTerrainValue += imageLoad(SC_image, pixelCoords - deltaX - deltaY).a;
 	}
 
 	// Bottom right inflow soil
 	if(pixelCoords.x != width - 1 && pixelCoords.y != 0){
-		newTerrainValue += imageLoad(S_image, pixelCoords + deltaX - deltaY).b;
+		newTerrainValue += imageLoad(SC_image, pixelCoords + deltaX - deltaY).b;
 	}
 
 	// Top left inflow soil
 	if(pixelCoords.x != 0 && pixelCoords.y != height - 1){
-		newTerrainValue += imageLoad(S_image, pixelCoords - deltaX + deltaY).g;
+		newTerrainValue += imageLoad(SC_image, pixelCoords - deltaX + deltaY).g;
 	}
 
 	// Top right inflow soil
 	if(pixelCoords.x != width - 1 && pixelCoords.y != height - 1){
-		newTerrainValue += imageLoad(S_image, pixelCoords + deltaX + deltaY).r;
+		newTerrainValue += imageLoad(SC_image, pixelCoords + deltaX + deltaY).r;
 	}
 
 	imageStore(CD_image_output, pixelCoords, vec4(centerColumn.r, centerColumn.g, centerColumn.b, newTerrainValue));

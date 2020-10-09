@@ -22,7 +22,7 @@ float Height(vec4 c, vec4 w){
 }
 
 float HeightDifference(float centerHeight, float adjacentHeight){
-	return max(0, centerHeight - adjacentHeight);
+	return centerHeight - adjacentHeight;
 }
 
 float HeightDifference(vec4 centerColumnData, vec4 centerWater, vec4 adjacentColumn, vec4 adjacentWater){
@@ -82,65 +82,73 @@ void main()
 
 		float maxHeightDifference = 0;
 		float A = 0;
+		float tempHeightDifference;
 
 		// Left
-		if(pixelCoords.x != 0 && HeightDifference(centerHeight, leftHeight) > talusHeightDiff){
-			maxHeightDifference = max(maxHeightDifference, HeightDifference(centerHeight, leftHeight));
-			A += HeightDifference(centerHeight, leftHeight);
-			newLeftValue = HeightDifference(centerHeight, leftHeight);
+		tempHeightDifference = HeightDifference(centerHeight, leftHeight);
+		if(pixelCoords.x != 0 && tempHeightDifference > talusHeightDiff){
+			maxHeightDifference = max(maxHeightDifference, tempHeightDifference);
+			A += tempHeightDifference;
+			newLeftValue = tempHeightDifference;
 		}
 
 		// Right
-		if(pixelCoords.x != width - 1 && HeightDifference(centerHeight, rightHeight) > talusHeightDiff){
-			maxHeightDifference = max(maxHeightDifference, HeightDifference(centerHeight, rightHeight));
-			A += HeightDifference(centerHeight, rightHeight);
-			newRightValue = HeightDifference(centerHeight, rightHeight);
+		tempHeightDifference = HeightDifference(centerHeight, rightHeight);
+		if(pixelCoords.x != width - 1 && tempHeightDifference > talusHeightDiff){
+			maxHeightDifference = max(maxHeightDifference, tempHeightDifference);
+			A += tempHeightDifference;
+			newRightValue = tempHeightDifference;
 		}
 
 		// Top
-		if(pixelCoords.y != height - 1 && HeightDifference(centerHeight, topHeight) > talusHeightDiff){
-			maxHeightDifference = max(maxHeightDifference, HeightDifference(centerHeight, topHeight));
-			A += HeightDifference(centerHeight, topHeight);
-			newTopValue = HeightDifference(centerHeight, topHeight);
+		tempHeightDifference = HeightDifference(centerHeight, topHeight);
+		if(pixelCoords.y != height - 1 && tempHeightDifference > talusHeightDiff){
+			maxHeightDifference = max(maxHeightDifference, tempHeightDifference);
+			A += tempHeightDifference;
+			newTopValue = tempHeightDifference;
 		}
 
 		// Bottom
-		if(pixelCoords.y != 0 && HeightDifference(centerHeight, bottomHeight) > talusHeightDiff){
-			maxHeightDifference = max(maxHeightDifference, HeightDifference(centerHeight, bottomHeight));
-			A += HeightDifference(centerHeight, bottomHeight);
-			newBottomValue = HeightDifference(centerHeight, bottomHeight);
+		tempHeightDifference = HeightDifference(centerHeight, bottomHeight);
+		if(pixelCoords.y != 0 && tempHeightDifference > talusHeightDiff){
+			maxHeightDifference = max(maxHeightDifference, tempHeightDifference);
+			A += tempHeightDifference;
+			newBottomValue = tempHeightDifference;
 		}
 
 		// Bottom Left
-		if(pixelCoords.x != 0 && pixelCoords.y != 0 && HeightDifference(centerHeight, bottomLeftHeight) > talusHeightDiff){
-			maxHeightDifference = max(maxHeightDifference, HeightDifference(centerHeight, bottomLeftHeight));
-			A += HeightDifference(centerHeight, bottomLeftHeight);
-			newBottomLeftValue = HeightDifference(centerHeight, bottomLeftHeight);
+		tempHeightDifference = HeightDifference(centerHeight, bottomLeftHeight);
+		if(pixelCoords.x != 0 && pixelCoords.y != 0 && tempHeightDifference > talusHeightDiff){
+			maxHeightDifference = max(maxHeightDifference, tempHeightDifference);
+			A += tempHeightDifference;
+			newBottomLeftValue = tempHeightDifference;
 		}
 
 		// Bottom Right
-		if(pixelCoords.x != width - 1 && pixelCoords.y != 0 && HeightDifference(centerHeight, bottomRightHeight) > talusHeightDiff){
-			maxHeightDifference = max(maxHeightDifference, HeightDifference(centerHeight, bottomRightHeight));
-			A += HeightDifference(centerHeight, bottomRightHeight);
-			newBottomRightValue = HeightDifference(centerHeight, bottomRightHeight);
+		tempHeightDifference = HeightDifference(centerHeight, bottomRightHeight);
+		if(pixelCoords.x != width - 1 && pixelCoords.y != 0 && tempHeightDifference > talusHeightDiff){
+			maxHeightDifference = max(maxHeightDifference, tempHeightDifference);
+			A += tempHeightDifference;
+			newBottomRightValue = tempHeightDifference;
 		}
 
 		// Top Left
-		if(pixelCoords.x != 0 && pixelCoords.y != height - 1 && HeightDifference(centerHeight, topLeftHeight) > talusHeightDiff){
-			maxHeightDifference = max(maxHeightDifference, HeightDifference(centerHeight, topLeftHeight));
-			A += HeightDifference(centerHeight, topLeftHeight);
-			newTopLeftValue = HeightDifference(centerHeight, topLeftHeight);
+		tempHeightDifference = HeightDifference(centerHeight, topLeftHeight);
+		if(pixelCoords.x != 0 && pixelCoords.y != height - 1 && tempHeightDifference > talusHeightDiff){
+			maxHeightDifference = max(maxHeightDifference, tempHeightDifference);
+			A += tempHeightDifference;
+			newTopLeftValue = tempHeightDifference;
 		}
 
 		// Top Right
-		if(pixelCoords.x != width - 1 && pixelCoords.y != height - 1 && HeightDifference(centerHeight, topRightHeight) > talusHeightDiff){
-			maxHeightDifference = max(maxHeightDifference, HeightDifference(centerHeight, topRightHeight));
-			A += HeightDifference(centerHeight, topRightHeight);
-			newTopRightValue = HeightDifference(centerHeight, topRightHeight);
+		tempHeightDifference = HeightDifference(centerHeight, topRightHeight);
+		if(pixelCoords.x != width - 1 && pixelCoords.y != height - 1 && tempHeightDifference > talusHeightDiff){
+			maxHeightDifference = max(maxHeightDifference, tempHeightDifference);
+			A += tempHeightDifference;
+			newTopRightValue = tempHeightDifference;
 		}
 
 		float columnArea = pipeLength * pipeLength;
-		columnArea = 1;
 
 		float sedimentVolume = columnArea * timeStep * Kt * (maxHeightDifference / 2);
 

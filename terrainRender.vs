@@ -53,11 +53,11 @@ void main()
 
 	vec3 tempTerrainColor = terrainColor;
 	if(columnDataTextureValue.b > 0){
-		tempTerrainColor = mix(tempTerrainColor, vegetationColor, columnDataTextureValue.b * 5);
+		tempTerrainColor = mix(tempTerrainColor, vegetationColor, columnDataTextureValue.b * 10);
 	}
 
 	if(waterDataTextureValue.a > 0){
-		tempTerrainColor = mix(tempTerrainColor, deadVegetationColor, waterDataTextureValue.a * 5);
+		tempTerrainColor = mix(tempTerrainColor, deadVegetationColor, waterDataTextureValue.a * 10);
 	}
 
 	VertexColor = tempTerrainColor;
