@@ -68,7 +68,7 @@ float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
 
 // texture settings
-const float HEIGHT_SCALING_VALUE = 5.0f;
+const float HEIGHT_SCALING_VALUE = 10.0f;
 vector<float> CDTexture(MESH_WIDTH * MESH_HEIGHT * 4);
 vector<float> EmptyTexture(MESH_WIDTH * MESH_HEIGHT * 4);
 unsigned int CDTextureID, WTextureID, FTextureID, VTextureID, RTextureID, STextureID, SCTextureID;
@@ -100,6 +100,7 @@ bool isVegetationSeed = false;
 // Terrain Generation Seeds
 const int terrainSeed = 8675309;
 const int vegetationSeed = 8675309;
+float maxVegetationValue = 0.1f;
 
 // Boolean Settings For Erosion Effects
 bool isSourceFlow = true;
@@ -111,20 +112,20 @@ bool isSoilFlow = true;
 // Water Increment Source and Rain settings
 const unsigned int SOURCE_FLOW_CUTOFF_TIME = (unsigned int)(15 * max(1.0f, MESH_WIDTH / 256.0f));
 const unsigned int RAIN_CUTOFF_TIME = (unsigned int)(15 * max(1.0f, MESH_WIDTH / 256.0f));
-const float Km = 0.0001f; // Regolith Max Height Constant
+const float Km = 0.00005f; // Regolith Max Height Constant
 int numberOfRaindrops = 1;
 int rainRadius;
 
 // Flux Update Settings
 const float wKf = 0.999f; // Water Friction Coefficient
-const float rKf = 0.1f; // Regolith Frition Coefficient
+const float rKf = 0.05f; // Regolith Frition Coefficient
 const float g = 9.81f; // Gravity Coefficient
 
 // Soil Flow Settings
 const float Kt = 2.0f;
 
 // Sediment Erosion and Deposition Settings
-const float Kdmax = 0.0001f; // Max Erosion Ramp Constant
+const float Kdmax = 0.00001f; // Max Erosion Ramp Constant
 const float Kc = 0.0003f; // Sediment Capacity Constant
 const float Ks = 0.0001f; // Dissolving Constant
 const float Kd = 0.0001f; // Deposition Constant
@@ -265,6 +266,7 @@ int main()
 	// water increment shader static properties
 	waterIncrementComputeShader.use();
 	waterIncrementComputeShader.setFloat("Km", Km);
+	waterIncrementComputeShader.setFloat("maxVegetationValue", maxVegetationValue);
 	waterIncrementComputeShader.setFloat("timeStep", TIME_STEP);
 	// set source values
 	waterIncrementComputeShader.setInt("currentNumberSources", 2);
@@ -339,6 +341,7 @@ int main()
 	sedimentErosionAndDepositionComputeShader.setFloat("Kd", Kd);
 	sedimentErosionAndDepositionComputeShader.setFloat("width", MESH_WIDTH);
 	sedimentErosionAndDepositionComputeShader.setFloat("height", MESH_HEIGHT);
+	sedimentErosionAndDepositionComputeShader.setFloat("maxVegetationValue", maxVegetationValue);
 
 	// sediment transportation shader static properties
 	sedimentTransportationComputeShader.use();
@@ -363,7 +366,7 @@ int main()
 	terrainRenderShader.setFloat("waterShininess", 64.0f);
 	terrainRenderShader.setVec3("terrainColor", 0.87f, 0.85f, 0.6f);
 	terrainRenderShader.setVec3("vegetationColor", 0.31f, 0.5f, 0.1f);
-	terrainRenderShader.setVec3("deadVegetationColor", 1.0f, 0.0f, 0.0f);
+	terrainRenderShader.setVec3("deadVegetationColor", 0.6f, 0.4f, 0.2f);
 	terrainRenderShader.setVec3("terrainSpecularColor", 0.0f, 0.0f, 0.0f);
 	terrainRenderShader.setVec3("waterColor", 0.1f, 0.6f, 1.0f);
 	terrainRenderShader.setVec3("waterSpecularColor", 1.0f, 1.0f, 1.0f);
@@ -1171,6 +1174,7 @@ void GenerateBaseTextures(unsigned int width, unsigned int height) {
 	if (!isVegetationSeed) {
 		float vegetationValue;
 		
+		float centerHeight;
 		float leftHeight;
 		float rightHeight;
 		float topHeight;
@@ -1186,8 +1190,11 @@ void GenerateBaseTextures(unsigned int width, unsigned int height) {
 
 		for (unsigned int j = 0; j < height; j++) {
 			for (unsigned int i = 0; i < width; i++) {
-				vegetationValue = 0.1f;
+				vegetationValue = maxVegetationValue;
 
+				location = GetLocation(i, j);
+				centerHeight = CDTexture[location + 3] + CDTexture[location + 2];
+				location = GetLocation(i - 1, j);
 				leftHeight = CDTexture[location + 3] + CDTexture[location + 2];
 				location = GetLocation(i + 1, j);
 				rightHeight = CDTexture[location + 3] + CDTexture[location + 2];
@@ -1200,6 +1207,11 @@ void GenerateBaseTextures(unsigned int width, unsigned int height) {
 				tbHeightDifference = abs(topHeight - bottomHeight);
 
 				totalHeightDifference = lrHeightDifference + tbHeightDifference;
+
+				/*if (centerHeight < 0.1f / HEIGHT_SCALING_VALUE) {
+					CDTexture[location + 2] = vegetationValue;
+					CDTexture[location + 3] -= vegetationValue;
+				}*/
 				
 				if (totalHeightDifference < MAX_HEIGHT_DIFFERENCE) {
 					percentage = min(1.0f, ((MAX_HEIGHT_DIFFERENCE - totalHeightDifference) / MAX_HEIGHT_DIFFERENCE) + 0.4f);

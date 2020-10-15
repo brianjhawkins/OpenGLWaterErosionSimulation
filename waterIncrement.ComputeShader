@@ -39,6 +39,8 @@ uniform Raindrop raindrops[MAX_NUMBER_RAINDROPS];
 // Regolith Constant
 uniform float Km;
 
+uniform float maxVegetationValue;
+
 uniform float timeStep;
 
 bool withinSourceRadius(int sourceX, int sourceY, int sourceRadius, int x, int y){
@@ -84,7 +86,6 @@ void main()
 	}
 
 	newWaterHeight += sourceIncrementValue + rainIncrementValue;
-	//newWaterHeight = 0;
 
 	// Add current regolith height back to the terrain height
 	newTerrainHeight += columnData.g;
@@ -97,10 +98,10 @@ void main()
 	}
 
 	if(newWaterHeight < Km){
-		newRegolithHeight = newWaterHeight;
+		newRegolithHeight = (newWaterHeight * (1 - newVegetationHeight / maxVegetationValue));
 	}
 	else{
-		newRegolithHeight = Km;
+		newRegolithHeight = (Km * (1 - newVegetationHeight / maxVegetationValue));
 	}
 
 	if(newTimeCovered > 1 && newVegetationHeight > 0){

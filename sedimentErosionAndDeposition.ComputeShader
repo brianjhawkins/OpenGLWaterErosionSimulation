@@ -21,6 +21,7 @@ uniform float dissolvingConstant;
 uniform float Kd;
 uniform float width;
 uniform float height;
+uniform float maxVegetationValue;
 
 float Height(vec4 c, vec4 w){
 	return c.g + w.a + c.b + c.a;
@@ -67,7 +68,7 @@ void main()
 	vec4 bottomWaterData = imageLoad(W_image, pixelCoords - deltaY);
 	
 	// Dissolving constant
-	float Ks = dissolvingConstant * max(0, (1.0f - 2.0f * centerColumnData.b));
+	float Ks = dissolvingConstant * (1 - centerColumnData.b / maxVegetationValue);
 
 	float newWaterHeight = centerColumnData.r;
 	float newTerrainHeight = centerColumnData.a;
