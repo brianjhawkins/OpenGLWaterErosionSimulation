@@ -10,7 +10,9 @@ layout(rgba32f, binding = 2) uniform image2D CD_image;
 layout(rgba32f, binding = 3) uniform image2D W_image;
 
 uniform bool isSoilFlow;
-uniform float talusHeightDiff;
+uniform float terrainTalusAngle;
+uniform float vegetationTalusAngle;
+uniform float maxVegetationValue;
 uniform float Kt;
 uniform float pipeLength;
 uniform float width;
@@ -83,10 +85,24 @@ void main()
 		float maxHeightDifference = 0;
 		float A = 0;
 		float tempHeightDifference;
+		float tempTalusAngle;
+		
+		float radianTalusAngle;
+		// If vegetation exists at point
+		if(centerColumnData.b > 0){
+			radianTalusAngle = mix(terrainTalusAngle, vegetationTalusAngle, (centerColumnData.b / maxVegetationValue)) * 0.01745329f; // Converting Degrees to Radians
+		}
+		else{
+			radianTalusAngle = terrainTalusAngle * 0.01745329f; // Converting Degrees to Radians
+		}
+
+		float cellSeparation = 1.0f / width;
+		float diagCellSeparation = cellSeparation * 1.414213562373095f;
 
 		// Left
 		tempHeightDifference = HeightDifference(centerHeight, leftHeight);
-		if(pixelCoords.x != 0 && tempHeightDifference > talusHeightDiff){
+		tempTalusAngle = atan(tempHeightDifference, cellSeparation);
+		if(pixelCoords.x != 0 && tempTalusAngle > radianTalusAngle){
 			maxHeightDifference = max(maxHeightDifference, tempHeightDifference);
 			A += tempHeightDifference;
 			newLeftValue = tempHeightDifference;
@@ -94,7 +110,8 @@ void main()
 
 		// Right
 		tempHeightDifference = HeightDifference(centerHeight, rightHeight);
-		if(pixelCoords.x != width - 1 && tempHeightDifference > talusHeightDiff){
+		tempTalusAngle = atan(tempHeightDifference, cellSeparation);
+		if(pixelCoords.x != (width - 1) && tempTalusAngle > radianTalusAngle){
 			maxHeightDifference = max(maxHeightDifference, tempHeightDifference);
 			A += tempHeightDifference;
 			newRightValue = tempHeightDifference;
@@ -102,7 +119,8 @@ void main()
 
 		// Top
 		tempHeightDifference = HeightDifference(centerHeight, topHeight);
-		if(pixelCoords.y != height - 1 && tempHeightDifference > talusHeightDiff){
+		tempTalusAngle = atan(tempHeightDifference, cellSeparation);
+		if(pixelCoords.y != (height - 1) && tempTalusAngle > radianTalusAngle){
 			maxHeightDifference = max(maxHeightDifference, tempHeightDifference);
 			A += tempHeightDifference;
 			newTopValue = tempHeightDifference;
@@ -110,7 +128,8 @@ void main()
 
 		// Bottom
 		tempHeightDifference = HeightDifference(centerHeight, bottomHeight);
-		if(pixelCoords.y != 0 && tempHeightDifference > talusHeightDiff){
+		tempTalusAngle = atan(tempHeightDifference, cellSeparation);
+		if(pixelCoords.y != 0 && tempTalusAngle > radianTalusAngle){
 			maxHeightDifference = max(maxHeightDifference, tempHeightDifference);
 			A += tempHeightDifference;
 			newBottomValue = tempHeightDifference;
@@ -118,7 +137,8 @@ void main()
 
 		// Bottom Left
 		tempHeightDifference = HeightDifference(centerHeight, bottomLeftHeight);
-		if(pixelCoords.x != 0 && pixelCoords.y != 0 && tempHeightDifference > talusHeightDiff){
+		tempTalusAngle = atan(tempHeightDifference, diagCellSeparation);
+		if(pixelCoords.x != 0 && pixelCoords.y != 0 && tempTalusAngle > radianTalusAngle){
 			maxHeightDifference = max(maxHeightDifference, tempHeightDifference);
 			A += tempHeightDifference;
 			newBottomLeftValue = tempHeightDifference;
@@ -126,7 +146,8 @@ void main()
 
 		// Bottom Right
 		tempHeightDifference = HeightDifference(centerHeight, bottomRightHeight);
-		if(pixelCoords.x != width - 1 && pixelCoords.y != 0 && tempHeightDifference > talusHeightDiff){
+		tempTalusAngle = atan(tempHeightDifference, diagCellSeparation);
+		if(pixelCoords.x != (width - 1) && pixelCoords.y != 0 && tempTalusAngle > radianTalusAngle){
 			maxHeightDifference = max(maxHeightDifference, tempHeightDifference);
 			A += tempHeightDifference;
 			newBottomRightValue = tempHeightDifference;
@@ -134,7 +155,8 @@ void main()
 
 		// Top Left
 		tempHeightDifference = HeightDifference(centerHeight, topLeftHeight);
-		if(pixelCoords.x != 0 && pixelCoords.y != height - 1 && tempHeightDifference > talusHeightDiff){
+		tempTalusAngle = atan(tempHeightDifference, diagCellSeparation);
+		if(pixelCoords.x != 0 && pixelCoords.y != (height - 1) && tempTalusAngle > radianTalusAngle){
 			maxHeightDifference = max(maxHeightDifference, tempHeightDifference);
 			A += tempHeightDifference;
 			newTopLeftValue = tempHeightDifference;
@@ -142,7 +164,8 @@ void main()
 
 		// Top Right
 		tempHeightDifference = HeightDifference(centerHeight, topRightHeight);
-		if(pixelCoords.x != width - 1 && pixelCoords.y != height - 1 && tempHeightDifference > talusHeightDiff){
+		tempTalusAngle = atan(tempHeightDifference, diagCellSeparation);
+		if(pixelCoords.x != (width - 1) && pixelCoords.y != (height - 1) && tempTalusAngle > radianTalusAngle){
 			maxHeightDifference = max(maxHeightDifference, tempHeightDifference);
 			A += tempHeightDifference;
 			newTopRightValue = tempHeightDifference;

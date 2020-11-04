@@ -29,8 +29,8 @@ vector<float> GenerateMeshVertices(unsigned int width, unsigned int height);
 vector<unsigned int> GenerateMeshIndices(unsigned int width, unsigned int height);
 void GenerateMeshTextures(unsigned int width, unsigned int height);
 void GenerateBaseTextures(unsigned int width, unsigned int height);
+void GenerateSquarePillar(unsigned int width, unsigned int height);
 unsigned int GetLocation(unsigned int i, unsigned int j);
-float TalusHeightDifference(float angle);
 
 // window settings
 const unsigned int SCR_WIDTH = 1980;
@@ -44,7 +44,7 @@ float lastFrame = 0.0f;
 glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
 
 // mesh settings
-const unsigned int MESH_WIDTH = 512;
+const unsigned int MESH_WIDTH = 1024;
 const unsigned int MESH_HEIGHT = MESH_WIDTH;
 const unsigned int MESH_TOTAL_SIZE = 5;
 const float MESH_SCALE = (float)MESH_TOTAL_SIZE / (float)MESH_WIDTH;
@@ -97,10 +97,17 @@ bool drawPolygon = false;
 bool isVegetation = true;
 bool isVegetationSeed = false;
 
-// Terrain Generation Seeds
+// Terrain Generation Settings
 const int terrainSeed = 8675309;
 const int vegetationSeed = 8675309;
 float maxVegetationValue = 0.1f;
+const bool isSquarePillarTerrain = false;
+
+// Terrain Rendering Fragment Shader Values
+const float baseTerrainAmplitude = 0.1f;
+const float baseTerrainFrequency = 10.0f;
+const float baseGrassAmplitude = 0.1f;
+const float baseGrassFrequency = 5.0f;
 
 // Boolean Settings For Erosion Effects
 bool isSourceFlow = true;
@@ -122,7 +129,10 @@ const float rKf = 0.05f; // Regolith Frition Coefficient
 const float g = 9.81f; // Gravity Coefficient
 
 // Soil Flow Settings
-const float Kt = 2.0f;
+const float Kt = 100.0f;
+const float terrainTalusAngle = 30.0f;
+const float vegetationTalusAngle = 60.0f;
+const unsigned int SOIL_FLOW_CUTOFF_TIME = (unsigned int)(45000 * max(1.0f, MESH_WIDTH / 256.0f));
 
 // Sediment Erosion and Deposition Settings
 const float Kdmax = 0.00001f; // Max Erosion Ramp Constant
@@ -325,7 +335,9 @@ int main()
 	// soil flow shader static properties
 	soilFlowComputeShader.use();
 	soilFlowComputeShader.setBool("isSoilFlow", isSoilFlow);
-	soilFlowComputeShader.setFloat("talusHeightDiff", TalusHeightDifference(60));
+	soilFlowComputeShader.setFloat("terrainTalusAngle", terrainTalusAngle);
+	soilFlowComputeShader.setFloat("vegetationTalusAngle", vegetationTalusAngle);
+	soilFlowComputeShader.setFloat("maxVegetationValue", maxVegetationValue);
 	soilFlowComputeShader.setFloat("Kt", Kt);
 	soilFlowComputeShader.setFloat("pipeLength", PIPE_LENGTH);
 	soilFlowComputeShader.setFloat("width", MESH_WIDTH);
@@ -370,6 +382,10 @@ int main()
 	terrainRenderShader.setVec3("terrainSpecularColor", 0.0f, 0.0f, 0.0f);
 	terrainRenderShader.setVec3("waterColor", 0.1f, 0.6f, 1.0f);
 	terrainRenderShader.setVec3("waterSpecularColor", 1.0f, 1.0f, 1.0f);
+	terrainRenderShader.setFloat("baseTerrainFrequency", baseTerrainFrequency);
+	terrainRenderShader.setFloat("baseTerrainAmplitude", baseTerrainAmplitude);
+	terrainRenderShader.setFloat("baseGrassFrequency", baseGrassFrequency);
+	terrainRenderShader.setFloat("baseGrassAmplitude", baseGrassAmplitude);
 	// set terrain render light properties
 	terrainRenderShader.setVec3("dirLight.direction", -0.0f, -1.0f, -0.0f);
 	terrainRenderShader.setVec3("dirLight.ambient", 0.4f, 0.4f, 0.4f);
@@ -394,6 +410,7 @@ int main()
 
 	float sourceFlowTime = 0;
 	float rainFallTime = 0;
+	float soilFlowTime = 0;
 
 	glm::mat4 projection;
 	glm::mat4 view;
@@ -583,6 +600,14 @@ int main()
 		glBindImageTexture(2, CDTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
 		// Link tempWTextureID to binding = 3 in soil flow shader
 		glBindImageTexture(3, tempWTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
+
+		if (soilFlowTime < SOIL_FLOW_CUTOFF_TIME) {
+			soilFlowTime += deltaTime;
+		}
+		else if (isSoilFlow) {
+			isSoilFlow = false;
+			soilFlowComputeShader.setBool("isSoilFlow", isSoilFlow);
+		}
 
 		glDispatchCompute((GLuint)NUM_GROUPS_X, (GLuint)NUM_GROUPS_Y, NUM_GROUPS_Z);
 		// Prevent from moving on until all compute shader calculations are done
@@ -941,7 +966,12 @@ vector<unsigned int> GenerateMeshIndices(unsigned int width, unsigned int height
 }
 
 void GenerateMeshTextures(unsigned int width, unsigned int height) {
-	GenerateBaseTextures(width, height);
+	if (!isSquarePillarTerrain) {
+		GenerateBaseTextures(width, height);
+	}
+	else {
+		GenerateSquarePillar(width, height);
+	}
 
 	// create texture for initial terrain data
 	glGenTextures(1, &CDTextureID);
@@ -1114,7 +1144,7 @@ void GenerateBaseTextures(unsigned int width, unsigned int height) {
 			float vegetationNoiseValue = 0;
 			if (isVegetation) {
 				if (isVegetationSeed) {
-					vegetationNoiseValue = vegetationNoise.GetNoise(iCoord * vegetationFrequencyScale * 0.93f, jCoord * vegetationFrequencyScale * 0.93f);
+					vegetationNoiseValue += vegetationNoise.GetNoise(iCoord * vegetationFrequencyScale * 0.93f, jCoord * vegetationFrequencyScale * 0.93f);
 					vegetationNoiseValue += 0.7f * vegetationNoise.GetNoise(iCoord / 0.7f * vegetationFrequencyScale, jCoord / 0.7f * vegetationFrequencyScale);
 					vegetationNoiseValue += 0.4f * vegetationNoise.GetNoise(iCoord / 0.4f * vegetationFrequencyScale, jCoord / 0.4f * vegetationFrequencyScale);
 
@@ -1184,7 +1214,7 @@ void GenerateBaseTextures(unsigned int width, unsigned int height) {
 		float tbHeightDifference;
 		float totalHeightDifference;
 
-		float MAX_HEIGHT_DIFFERENCE = 0.03f / HEIGHT_SCALING_VALUE;
+		float MAX_HEIGHT_DIFFERENCE = (0.06f * 256.0f / MESH_WIDTH) / HEIGHT_SCALING_VALUE;
 
 		float percentage;
 
@@ -1208,6 +1238,7 @@ void GenerateBaseTextures(unsigned int width, unsigned int height) {
 
 				totalHeightDifference = lrHeightDifference + tbHeightDifference;
 
+				// 1D Height Texture for setting vegtation values
 				/*if (centerHeight < 0.1f / HEIGHT_SCALING_VALUE) {
 					CDTexture[location + 2] = vegetationValue;
 					CDTexture[location + 3] -= vegetationValue;
@@ -1220,6 +1251,68 @@ void GenerateBaseTextures(unsigned int width, unsigned int height) {
 					CDTexture[location + 3] -= vegetationValue;
 				}
 			}
+		}
+	}
+}
+
+void GenerateSquarePillar(unsigned int width, unsigned int height) {
+	unsigned int location;
+	float terrainValue;
+
+	for (unsigned int j = 0; j < height; j++) {
+		for (unsigned int i = 0; i < width; i++) {
+			location = GetLocation(i, j);
+			terrainValue = 0.0f;
+
+			if (i > width * 0.45f && i < width * 0.55f && j > height * 0.45f && j < height * 0.55f) {
+				terrainValue = 0.1f;
+			}
+
+			//////////////////////////////
+			// Initial Column Data Texture (CDTexture)
+			//////////////////////////////
+			// R = water height value
+			// G = regolith height value
+			// B = vegetation height value
+			// A = terrain height value
+			//////////////////////////////
+			CDTexture[location + 0] = 0.0f;
+			CDTexture[location + 1] = 0.0f;
+			CDTexture[location + 2] = 0.0f;
+			CDTexture[location + 3] = terrainValue;
+
+			////////////////////////////////////////////////////
+			// All of the textures below are initially empty (0)
+			////////////////////////////////////////////////////
+
+			//////////////////////////////
+			// Initial Water Data Texture (WTexture)
+			//////////////////////////////
+			// R = terrain sediment value
+			// G = dead vegetation sediment value
+			// B = time covered in water value
+			// A = dead vegetation height value
+			//////////////////////////////
+			//////////////////////////////
+			// Initial Flux Texture (FTexture)
+			//////////////////////////////
+			// R = left flux value
+			// G = right flux value
+			// B = top flux value
+			// A = bottom flux value
+			//////////////////////////////
+			//////////////////////////////
+			// Initial Velocity Texture (VTexture)
+			//////////////////////////////
+			// R = velocity in x-direction
+			// G = velocity in y-direction
+			// B = 
+			// A = 
+			//////////////////////////////
+			EmptyTexture[location + 0] = 0.0f;
+			EmptyTexture[location + 1] = 0.0f;
+			EmptyTexture[location + 2] = 0.0f;
+			EmptyTexture[location + 3] = 0.0f;
 		}
 	}
 }
@@ -1243,10 +1336,4 @@ unsigned int GetLocation(unsigned int i, unsigned int j) {
 	}
 
 	return (x + y * MESH_WIDTH) * 4;
-}
-
-float TalusHeightDifference(float angle) {
-	float height = (1.0f / MESH_WIDTH) * atan(glm::radians(angle));
-	//cout << "Talus Height Difference: " << height << endl;
-	return height;
 }

@@ -98,10 +98,10 @@ void main()
 	}
 
 	if(newWaterHeight < Km){
-		newRegolithHeight = (newWaterHeight * (1 - newVegetationHeight / maxVegetationValue));
+		newRegolithHeight = (newWaterHeight * (1 - ((newVegetationHeight / maxVegetationValue) * 0.8f)));
 	}
 	else{
-		newRegolithHeight = (Km * (1 - newVegetationHeight / maxVegetationValue));
+		newRegolithHeight = (Km * (1 - ((newVegetationHeight / maxVegetationValue) * 0.8f)));
 	}
 
 	if(newTimeCovered > 1 && newVegetationHeight > 0){

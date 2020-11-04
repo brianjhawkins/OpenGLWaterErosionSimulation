@@ -20,8 +20,19 @@ void main()
 	ivec2 deltaY = ivec2(0, 1);
 
 	vec4 centerColumn = imageLoad(CD_image, pixelCoords);
+	vec4 centerSValues = imageLoad(S_image, pixelCoords);
+	vec4 centerSCValues = imageLoad(SC_image, pixelCoords);
 
 	float newTerrainValue = centerColumn.a;
+	// Subtract deposited values from center column height
+	newTerrainValue -= centerSValues.r;
+	newTerrainValue -= centerSValues.g;
+	newTerrainValue -= centerSValues.b;
+	newTerrainValue -= centerSValues.a;
+	newTerrainValue -= centerSCValues.r;
+	newTerrainValue -= centerSCValues.g;
+	newTerrainValue -= centerSCValues.b;
+	newTerrainValue -= centerSCValues.a;
 
 	// Left inflow soil
 	if(pixelCoords.x != 0){
