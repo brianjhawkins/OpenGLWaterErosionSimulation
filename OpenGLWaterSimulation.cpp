@@ -1,6 +1,5 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
-#include <assimp/config.h>
 #include "stb_image.h"
 #include "FastNoise.h"
 
@@ -13,8 +12,6 @@
 
 #include "shader.h"
 #include "camera.h"
-#include "model.h"
-#include "mesh.h"
 
 #include <iostream>
 
@@ -24,7 +21,6 @@ void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void mouse_callback(GLFWwindow* window, double xpos, double ypos);
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
-unsigned int loadTexture(const char* path);
 vector<float> GenerateMeshVertices(unsigned int width, unsigned int height);
 vector<unsigned int> GenerateMeshIndices(unsigned int width, unsigned int height);
 void GenerateMeshTextures(unsigned int width, unsigned int height);
@@ -39,9 +35,6 @@ const unsigned int SCR_HEIGHT = 1018;
 // timing
 float deltaTime = 0.0f;	// time between current frame and last frame
 float lastFrame = 0.0f;
-
-// light
-glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
 
 // mesh settings
 const unsigned int MESH_WIDTH = 1024;
@@ -58,14 +51,21 @@ vector<float> meshVertices;
 //Camera camera(glm::vec3(0.0f, 1.5f * MESH_TOTAL_SIZE, 0.0f));
 
 // Camera just above the ground, focusing on distinction between vegetated and non-vegetated erosion
-//Camera camera(glm::vec3(-0.2f * MESH_TOTAL_SIZE / 2.0f, 0.4f * MESH_TOTAL_SIZE, -0.4f * MESH_TOTAL_SIZE / 2.0f), glm::vec3(0, 1, 0), 35, -55);
+//Camera camera(glm::vec3(-1.0f * MESH_TOTAL_SIZE / 2.0f, 0.02f * MESH_TOTAL_SIZE, -1.1f * MESH_TOTAL_SIZE / 2.0f), glm::vec3(0, 1, 0), 50, -15);
 
-// Camera zoomed out to view entire terrain
-Camera camera(glm::vec3(-1.9f * MESH_TOTAL_SIZE / 2.0f, 1.0f * MESH_TOTAL_SIZE, -1.3f * MESH_TOTAL_SIZE / 2.0f), glm::vec3(0, 1, 0), 35, -45);
+// Camera zoomed in on three pillars
+//Camera camera(glm::vec3(-0.7f * MESH_TOTAL_SIZE / 2.0f, 0.4f * MESH_TOTAL_SIZE, -0.7f * MESH_TOTAL_SIZE / 2.0f), glm::vec3(0, 1, 0), 45, -35);
+
+// Camera zoomed in on entire terrain
+//Camera camera(glm::vec3(-1.5f * MESH_TOTAL_SIZE / 2.0f, 1.3f * MESH_TOTAL_SIZE, -1.5f * MESH_TOTAL_SIZE / 2.0f), glm::vec3(0, 1, 0), 45, -55);
+
+// Camera focused on entire terrain focusing on a single edge
+Camera camera(glm::vec3(-1.8f * MESH_TOTAL_SIZE / 2.0f, 0.8f * MESH_TOTAL_SIZE, 0.0f), glm::vec3(0, 1, 0), 0, -45);
 
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
+int cameraChange = 0;
 
 // texture settings
 const float HEIGHT_SCALING_VALUE = 10.0f;
@@ -93,14 +93,20 @@ bool drawPolygon = false;
 //////////////////////////////  Main Simulation Settings  //////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////
 
+// Lighting Settings
+glm::vec3 lightDirection(-1.0, -1.0, -1.0);
+
+// Movie Mode Setting
+bool isMovieMode = true;
+
 // Vegetation Boolean Values
-bool isVegetation = true;
+bool isVegetation = false;
 bool isVegetationSeed = false;
 
 // Terrain Generation Settings
 const int terrainSeed = 8675309;
-const int vegetationSeed = 8675309;
-float maxVegetationValue = 0.1f;
+const int vegetationSeed = 1337;
+float maxVegetationValue = 0.0035f;
 const bool isSquarePillarTerrain = false;
 
 // Terrain Rendering Fragment Shader Values
@@ -125,26 +131,26 @@ int rainRadius;
 
 // Flux Update Settings
 const float wKf = 0.999f; // Water Friction Coefficient
-const float rKf = 0.05f; // Regolith Frition Coefficient
+const float rKf = 0.3f; // Regolith Frition Coefficient
 const float g = 9.81f; // Gravity Coefficient
 
 // Soil Flow Settings
 const float Kt = 100.0f;
-const float terrainTalusAngle = 30.0f;
-const float vegetationTalusAngle = 60.0f;
+const float terrainTalusAngle = 35.0f;
+const float vegetationTalusAngle = 50.0f;
 const unsigned int SOIL_FLOW_CUTOFF_TIME = (unsigned int)(45000 * max(1.0f, MESH_WIDTH / 256.0f));
 
 // Sediment Erosion and Deposition Settings
-const float Kdmax = 0.00001f; // Max Erosion Ramp Constant
-const float Kc = 0.0003f; // Sediment Capacity Constant
-const float Ks = 0.0001f; // Dissolving Constant
-const float Kd = 0.0001f; // Deposition Constant
+const float Kdmax = 0.007f; // Max Erosion Ramp Constant
+const float Kc = 0.0004f; // Sediment Capacity Constant
+const float Ks = 0.00003f; // Dissolving Constant
+const float Kd = 0.00003f; // Deposition Constant
 
 // Evaporation Settings
 const float Ke = 3; // Evaporation Constant
 
 // Simulation Settings
-const float TIME_STEP = min(0.002f, 1 / (MESH_WIDTH * 2.0f));
+const float TIME_STEP = min(0.002f, 0.002f * (256.0f / MESH_WIDTH));
 const float PIPE_LENGTH = 256.0f / MESH_WIDTH;
 const float PIPE_CROSS_SECTION_AREA = 20 * PIPE_LENGTH;
 
@@ -206,10 +212,7 @@ int main()
 	// ------------------------------------
 	Shader waterIncrementComputeShader("waterIncrement.ComputeShader");
 	Shader fluxUpdateComputeShader("fluxUpdate.ComputeShader");
-	//Shader regolithFluxUpdateComputeShader("regolithFluxUpdate.ComputeShader");
 	Shader heightUpdateComputeShader("heightUpdate.ComputeShader");
-	//Shader waterHeightUpdateComputeShader("waterHeightUpdate.ComputeShader");
-	//Shader regolithHeightUpdateComputeShader("regolithHeightUpdate.ComputeShader");
 	Shader velocityFieldUpdateComputeShader("velocityFieldUpdate.ComputeShader");
 	Shader soilFlowComputeShader("soilFlow.ComputeShader");
 	Shader sedimentErosionAndDepositionComputeShader("sedimentErosionAndDeposition.ComputeShader");
@@ -307,24 +310,12 @@ int main()
 	fluxUpdateComputeShader.setFloat("height", MESH_HEIGHT);
 	fluxUpdateComputeShader.setFloat("timeStep", TIME_STEP);
 
-	// regolith flux shader static properties
-	//regolithFluxUpdateComputeShader.use();
-	//regolithFluxUpdateComputeShader.setFloat("timeStep", TIME_STEP);
-
 	// height shader static properties
 	heightUpdateComputeShader.use();
 	heightUpdateComputeShader.setFloat("pipeLength", PIPE_LENGTH);
 	heightUpdateComputeShader.setFloat("width", MESH_WIDTH);
 	heightUpdateComputeShader.setFloat("height", MESH_HEIGHT);
 	heightUpdateComputeShader.setFloat("timeStep", TIME_STEP);
-
-	// water height shader static properties
-	//waterHeightUpdateComputeShader.use();
-	//waterHeightUpdateComputeShader.setFloat("timeStep", TIME_STEP);
-
-	// regolith height shader static properties
-	//regolithHeightUpdateComputeShader.use();
-	//regolithHeightUpdateComputeShader.setFloat("timeStep", TIME_STEP);
 
 	// velocity update static properties
 	velocityFieldUpdateComputeShader.use();
@@ -340,6 +331,8 @@ int main()
 	soilFlowComputeShader.setFloat("maxVegetationValue", maxVegetationValue);
 	soilFlowComputeShader.setFloat("Kt", Kt);
 	soilFlowComputeShader.setFloat("pipeLength", PIPE_LENGTH);
+	soilFlowComputeShader.setFloat("cellSeparation", 1.0f / MESH_WIDTH);
+	soilFlowComputeShader.setFloat("diagCellSeparation", 1.414213562373095f / MESH_WIDTH);
 	soilFlowComputeShader.setFloat("width", MESH_WIDTH);
 	soilFlowComputeShader.setFloat("height", MESH_HEIGHT);
 	soilFlowComputeShader.setFloat("timeStep", TIME_STEP);
@@ -365,15 +358,18 @@ int main()
 	soilFlowDepositionComputeShader.use();
 	soilFlowDepositionComputeShader.setFloat("width", MESH_WIDTH);
 	soilFlowDepositionComputeShader.setFloat("height", MESH_HEIGHT);
+	soilFlowDepositionComputeShader.setFloat("pipeLength", PIPE_LENGTH);
 
 	// evaporation shader static properties
 	evaporationComputeShader.use();
 	evaporationComputeShader.setFloat("evaporationConstant", Ke);
+	evaporationComputeShader.setFloat("maxVegetationValue", maxVegetationValue);
 	evaporationComputeShader.setFloat("timeStep", TIME_STEP);
 
 	// terrain render shader static properties
 	terrainRenderShader.use();
 	terrainRenderShader.setFloat("size", MESH_TOTAL_SIZE);
+	terrainRenderShader.setFloat("maxVegetationValue", maxVegetationValue);
 	terrainRenderShader.setFloat("terrainShininess", 1.0f);
 	terrainRenderShader.setFloat("waterShininess", 64.0f);
 	terrainRenderShader.setVec3("terrainColor", 0.87f, 0.85f, 0.6f);
@@ -387,7 +383,7 @@ int main()
 	terrainRenderShader.setFloat("baseGrassFrequency", baseGrassFrequency);
 	terrainRenderShader.setFloat("baseGrassAmplitude", baseGrassAmplitude);
 	// set terrain render light properties
-	terrainRenderShader.setVec3("dirLight.direction", -0.0f, -1.0f, -0.0f);
+	terrainRenderShader.setVec3("dirLight.direction", lightDirection);
 	terrainRenderShader.setVec3("dirLight.ambient", 0.4f, 0.4f, 0.4f);
 	terrainRenderShader.setVec3("dirLight.diffuse", 0.5f, 0.5f, 0.5f);
 	terrainRenderShader.setVec3("dirLight.specular", 1.0f, 1.0f, 1.0f);
@@ -402,8 +398,8 @@ int main()
 	waterRenderShader.setVec3("terrainSpecularColor", 0.0f, 0.0f, 0.0f);
 	waterRenderShader.setVec3("waterColor", 0.1f, 0.6f, 1.0f);
 	waterRenderShader.setVec3("waterSpecularColor", 1.0f, 1.0f, 1.0f);
-	// set terrain render light properties
-	waterRenderShader.setVec3("dirLight.direction", -0.0f, -1.0f, -0.0f);
+	// set water render light properties
+	waterRenderShader.setVec3("dirLight.direction", lightDirection);
 	waterRenderShader.setVec3("dirLight.ambient", 0.4f, 0.4f, 0.4f);
 	waterRenderShader.setVec3("dirLight.diffuse", 0.5f, 0.5f, 0.5f);
 	waterRenderShader.setVec3("dirLight.specular", 1.0f, 1.0f, 1.0f);
@@ -417,6 +413,15 @@ int main()
 	glm::mat4 model;
 
 	glfwSetTime(0);
+	float currentFrame;
+	float cycleCount = 1;
+	float startTime;
+	float endTime;
+	float timeDifference;
+	float sumSimulationDifferences = 0;
+	float averageSimulationTime;
+	float sumRenderingDifferences = 0;
+	float averageRenderingTime;
 
 	// render loop
 	// -----------
@@ -424,7 +429,7 @@ int main()
 	{
 		// per-frame time logic
 		// --------------------
-		float currentFrame = (float)glfwGetTime();
+		currentFrame = (float)glfwGetTime();
 		deltaTime = currentFrame - lastFrame;
 		lastFrame = currentFrame;
 
@@ -433,6 +438,8 @@ int main()
 		// input
 		// -----
 		processInput(window);
+
+		startTime = (float)glfwGetTime();
 
 		// First Pass: Water Increment Step
 		waterIncrementComputeShader.use();
@@ -502,34 +509,6 @@ int main()
 		// Prevent from moving on until all compute shader calculations are done
 		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
-		/*
-		// Second Pass: Flux Update Step
-		fluxUpdateComputeShader.use();
-		// Link tempFTextureID to the output (binding = 0) in flux update shader
-		glBindImageTexture(0, tempFTextureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, INTERNAL_TEXTURE_FORMAT);
-		// Link tempCDTextureID to binding = 1 in flux update shader
-		glBindImageTexture(1, tempCDTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
-		// Link FTextureID to binding = 2 in flux update shader
-		glBindImageTexture(2, FTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
-		
-		glDispatchCompute((GLuint)NUM_GROUPS_X, (GLuint)NUM_GROUPS_Y, NUM_GROUPS_Z);
-		// Prevent from moving on until all compute shader calculations are done
-		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-
-		// Third Pass: Regolith Flux Update Step
-		regolithFluxUpdateComputeShader.use();
-		// Link tempFTextureID to binding = 0 in flux update shader
-		glBindImageTexture(0, tempRTextureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, INTERNAL_TEXTURE_FORMAT);
-		// Link tempCDTextureID to binding = 1 in flux update shader
-		glBindImageTexture(1, tempCDTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
-		// Link FTextureID to binding = 2 in flux update shader
-		glBindImageTexture(2, RTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
-
-		glDispatchCompute((GLuint)NUM_GROUPS_X, (GLuint)NUM_GROUPS_Y, NUM_GROUPS_Z);
-		// Prevent from moving on until all compute shader calculations are done
-		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-		*/
-
 		// Third Pass: Height (Water and Regolith) Update Step
 		heightUpdateComputeShader.use();
 		// Link CDTextureID to binding = 0 in water height update shader
@@ -544,34 +523,6 @@ int main()
 		glDispatchCompute((GLuint)NUM_GROUPS_X, (GLuint)NUM_GROUPS_Y, NUM_GROUPS_Z);
 		// Prevent from moving on until all compute shader calculations are done
 		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-
-		/*
-		// Fourth Pass: Water Height Update Step
-		waterHeightUpdateComputeShader.use();
-		// Link CDTextureID to binding = 0 in water height update shader
-		glBindImageTexture(0, CDTextureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, INTERNAL_TEXTURE_FORMAT);
-		// Link tempCDTextureID to binding = 1 in water height update shader
-		glBindImageTexture(1, tempCDTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
-		// Link tempFTextureID to binding = 2 in water height update shader
-		glBindImageTexture(2, tempFTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
-		
-		glDispatchCompute((GLuint)NUM_GROUPS_X, (GLuint)NUM_GROUPS_Y, NUM_GROUPS_Z);
-		// Prevent from moving on until all compute shader calculations are done
-		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-
-		// Fifth Pass: Regolith Height Update Step
-		regolithHeightUpdateComputeShader.use();
-		// Link tempCDTextureID to binding = 0 in regolith height update shader
-		glBindImageTexture(0, tempCDTextureID, 0, GL_FALSE, 0, GL_WRITE_ONLY, INTERNAL_TEXTURE_FORMAT);
-		// Link CDTextureID to binding = 1 in regolith height update shader
-		glBindImageTexture(1, CDTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
-		// Link tempFTextureID to binding = 2 in regolith height update shader
-		glBindImageTexture(2, tempRTextureID, 0, GL_FALSE, 0, GL_READ_ONLY, INTERNAL_TEXTURE_FORMAT);
-
-		glDispatchCompute((GLuint)NUM_GROUPS_X, (GLuint)NUM_GROUPS_Y, NUM_GROUPS_Z);
-		// Prevent from moving on until all compute shader calculations are done
-		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-		*/
 	
 		// Sixth Pass: Velocity Field Update Step
 		velocityFieldUpdateComputeShader.use();
@@ -669,20 +620,56 @@ int main()
 		// Prevent from moving on until all compute shader calculations are done
 		glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
 
+		endTime = (float)glfwGetTime();
+		timeDifference = endTime - startTime;
+		sumSimulationDifferences += timeDifference;
+		averageSimulationTime = sumSimulationDifferences / cycleCount;
+
+		cout << "Sim Time: " << averageSimulationTime << endl;
+
 		// Final Pass: Terrain Render Step
 		// render
 		// ------
 		glClearColor(0.8f, 0.8f, 0.8f, 1.0f);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);	
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		if (isMovieMode) {
+			if (cameraChange == 0 && glfwGetTime() > 20) {
+				camera.Position = glm::vec3(-1.0f * MESH_TOTAL_SIZE / 2.0f, 0.02f * MESH_TOTAL_SIZE, -1.1f * MESH_TOTAL_SIZE / 2.0f);
+				camera.SetYawAndPitch(50, -15);
+				cameraChange++;
+			}
+
+			if (cameraChange == 1 && glfwGetTime() > 120) {
+				camera.Position = glm::vec3(-1.8f * MESH_TOTAL_SIZE / 2.0f, 0.8f * MESH_TOTAL_SIZE, 0.0f), glm::vec3(0, 1, 0);
+				camera.SetYawAndPitch(0, -45);
+				cameraChange++;
+			}
+
+			if (cameraChange == 2 && glfwGetTime() > 130) {
+				float radius = 3.0f;
+				float speed = 0.1f;
+				float camX = sin((glfwGetTime() - 130) * speed) * radius;
+				float camZ = cos((glfwGetTime() - 130) * speed) * radius;
+
+				view = glm::lookAt(glm::vec3(camX, 1.0f, camZ), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+			}
+			else {
+				view = camera.GetViewMatrix();
+			}
+		}
+		else {
+			// camera/view transformation
+			view = camera.GetViewMatrix();
+		}
 
 		// projection matrix
 		projection = glm::perspective(glm::radians(camera.Zoom), (float)SCR_WIDTH / (float)SCR_HEIGHT, 0.1f, 100.0f);
 
-		// camera/view transformation
-		view = camera.GetViewMatrix();
-
 		model = glm::mat4(1.0f);
 		model = glm::translate(model, glm::vec3(-(MESH_TOTAL_SIZE / 2.0f), 0.0f, -(MESH_TOTAL_SIZE / 2.0f)));
+
+		startTime = (float)glfwGetTime();
 
 		// activate terrain render shader
 		terrainRenderShader.use();
@@ -727,6 +714,14 @@ int main()
 		glBindVertexArray(wMeshVAO);
 		glDrawElements(GL_TRIANGLES, meshIndices.size(), GL_UNSIGNED_INT, 0);
 		glBindVertexArray(0);
+
+		endTime = (float)glfwGetTime();
+		timeDifference = endTime - startTime;
+		sumRenderingDifferences += timeDifference;
+		averageRenderingTime = sumRenderingDifferences / cycleCount;
+		cycleCount++;
+
+		cout << "Rend Time: " << averageRenderingTime << endl;
 
 		// Swap info in tempCDTexture to CDTexture
 		swapBuffersComputeShader.use();
@@ -820,29 +815,31 @@ void processInput(GLFWwindow *window)
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
 		glfwSetWindowShouldClose(window, true);
 
-	if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
-		camera.ProcessKeyboard(FORWARD, deltaTime);
-	}
-	if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
-		camera.ProcessKeyboard(BACKWARD, deltaTime);
-	}
-	if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
-		camera.ProcessKeyboard(LEFT, deltaTime);
-	}
-	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
-		camera.ProcessKeyboard(RIGHT, deltaTime);
-	}
-	if (glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS) {
-		float currentPressTime = (float)glfwGetTime();
+	if (!isMovieMode) {
+		if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
+			camera.ProcessKeyboard(FORWARD, deltaTime);
+		}
+		if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+			camera.ProcessKeyboard(BACKWARD, deltaTime);
+		}
+		if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
+			camera.ProcessKeyboard(LEFT, deltaTime);
+		}
+		if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
+			camera.ProcessKeyboard(RIGHT, deltaTime);
+		}
+		if (glfwGetKey(window, GLFW_KEY_P) == GLFW_PRESS) {
+			float currentPressTime = (float)glfwGetTime();
 
-		if (currentPressTime - pLastPressTime > KEY_PRESS_DELAY) {
-			pLastPressTime = currentPressTime;
-			drawPolygon = !drawPolygon;
-			if (drawPolygon) {
-				glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-			}
-			else {
-				glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+			if (currentPressTime - pLastPressTime > KEY_PRESS_DELAY) {
+				pLastPressTime = currentPressTime;
+				drawPolygon = !drawPolygon;
+				if (drawPolygon) {
+					glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+				}
+				else {
+					glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+				}
 			}
 		}
 	}
@@ -875,55 +872,23 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
 	lastX = (float)xpos;
 	lastY = (float)ypos;
 
-	camera.ProcessMouseMovement(xoffset, yoffset);
+	if (!isMovieMode) {
+		camera.ProcessMouseMovement(xoffset, yoffset);
+	}
 }
 
 // glfw: whenever the mouse scroll wheel scrolls, this callback is called
 // ----------------------------------------------------------------------
 void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
-	camera.ProcessMouseScroll((float)yoffset);
-}
-
-unsigned int loadTexture(char const* path) {
-	unsigned int textureID;
-	glGenTextures(1, &textureID);
-
-	int width, height, nrComponents;
-	unsigned char* data = stbi_load(path, &width, &height, &nrComponents, 0);
-
-	if (data) {
-		GLenum format;
-		if (nrComponents == 1) {
-			format = GL_RED;
-		}
-		else if (nrComponents == 3) {
-			format = GL_RGB;
-		}
-		else if (nrComponents == 4) {
-			format = GL_RGBA;
-		}
-
-		glBindTexture(GL_TEXTURE_2D, textureID);
-		glTexImage2D(GL_TEXTURE_2D, 0, format, width, height, 0, format, GL_UNSIGNED_BYTE, data);
-		glGenerateMipmap(GL_TEXTURE_2D);
-
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	if (!isMovieMode) {
+		camera.ProcessMouseScroll((float)yoffset);
 	}
-	else {
-		cout << "Texture failed to load at path: " << path << endl;
-	}
-
-	stbi_image_free(data);
-
-	return textureID;
 }
 
 vector<float> GenerateMeshVertices(unsigned int width, unsigned int height) {
 	vector<float> vertexList;
+	vertexList.reserve(5 * width * height);
 
 	// Generate vertex positions and texture coordinates
 	for (unsigned int j = 0; j < height; j++) {
@@ -944,6 +909,7 @@ vector<float> GenerateMeshVertices(unsigned int width, unsigned int height) {
 
 vector<unsigned int> GenerateMeshIndices(unsigned int width, unsigned int height) {
 	vector<unsigned int> indexList;
+	indexList.reserve(6 * width * height);
 	unsigned int index;
 
 	for (unsigned int j = 0; j < height - 1; j++) {
@@ -1144,12 +1110,13 @@ void GenerateBaseTextures(unsigned int width, unsigned int height) {
 			float vegetationNoiseValue = 0;
 			if (isVegetation) {
 				if (isVegetationSeed) {
-					vegetationNoiseValue += vegetationNoise.GetNoise(iCoord * vegetationFrequencyScale * 0.93f, jCoord * vegetationFrequencyScale * 0.93f);
-					vegetationNoiseValue += 0.7f * vegetationNoise.GetNoise(iCoord / 0.7f * vegetationFrequencyScale, jCoord / 0.7f * vegetationFrequencyScale);
-					vegetationNoiseValue += 0.4f * vegetationNoise.GetNoise(iCoord / 0.4f * vegetationFrequencyScale, jCoord / 0.4f * vegetationFrequencyScale);
+					vegetationNoiseValue += 3 * vegetationNoise.GetNoise(iCoord * vegetationFrequencyScale, jCoord * vegetationFrequencyScale);
+					vegetationNoiseValue += 1.5f * vegetationNoise.GetNoise(2 * iCoord * vegetationFrequencyScale, 2 * jCoord * vegetationFrequencyScale);
+					vegetationNoiseValue += 0.75f * vegetationNoise.GetNoise(4 * iCoord * vegetationFrequencyScale, 4 * jCoord * vegetationFrequencyScale);
 
 					vegetationNoiseValue = max(0.0f, vegetationNoiseValue);
 					vegetationNoiseValue /= HEIGHT_SCALING_VALUE;
+					vegetationNoiseValue = min(maxVegetationValue, vegetationNoiseValue);
 				}
 			}
 
@@ -1201,54 +1168,56 @@ void GenerateBaseTextures(unsigned int width, unsigned int height) {
 		}
 	}
 
-	if (!isVegetationSeed) {
-		float vegetationValue;
-		
-		float centerHeight;
-		float leftHeight;
-		float rightHeight;
-		float topHeight;
-		float bottomHeight;
+	if (isVegetation) {
+		if (!isVegetationSeed) {
+			float vegetationValue;
 
-		float lrHeightDifference;
-		float tbHeightDifference;
-		float totalHeightDifference;
+			float centerHeight;
+			float leftHeight;
+			float rightHeight;
+			float topHeight;
+			float bottomHeight;
 
-		float MAX_HEIGHT_DIFFERENCE = (0.06f * 256.0f / MESH_WIDTH) / HEIGHT_SCALING_VALUE;
+			float lrHeightDifference;
+			float tbHeightDifference;
+			float totalHeightDifference;
 
-		float percentage;
+			float MAX_HEIGHT_DIFFERENCE = (0.06f * 256.0f / MESH_WIDTH) / HEIGHT_SCALING_VALUE;
 
-		for (unsigned int j = 0; j < height; j++) {
-			for (unsigned int i = 0; i < width; i++) {
-				vegetationValue = maxVegetationValue;
+			float percentage;
 
-				location = GetLocation(i, j);
-				centerHeight = CDTexture[location + 3] + CDTexture[location + 2];
-				location = GetLocation(i - 1, j);
-				leftHeight = CDTexture[location + 3] + CDTexture[location + 2];
-				location = GetLocation(i + 1, j);
-				rightHeight = CDTexture[location + 3] + CDTexture[location + 2];
-				location = GetLocation(i, j + 1);
-				topHeight = CDTexture[location + 3] + CDTexture[location + 2];
-				location = GetLocation(i, j - 1);
-				bottomHeight = CDTexture[location + 3] + CDTexture[location + 2];
-				
-				lrHeightDifference = abs(leftHeight - rightHeight);
-				tbHeightDifference = abs(topHeight - bottomHeight);
+			for (unsigned int j = 0; j < height; j++) {
+				for (unsigned int i = 0; i < width; i++) {
+					vegetationValue = maxVegetationValue;
 
-				totalHeightDifference = lrHeightDifference + tbHeightDifference;
+					location = GetLocation(i, j);
+					centerHeight = CDTexture[location + 3] + CDTexture[location + 2];
+					location = GetLocation(i - 1, j);
+					leftHeight = CDTexture[location + 3] + CDTexture[location + 2];
+					location = GetLocation(i + 1, j);
+					rightHeight = CDTexture[location + 3] + CDTexture[location + 2];
+					location = GetLocation(i, j + 1);
+					topHeight = CDTexture[location + 3] + CDTexture[location + 2];
+					location = GetLocation(i, j - 1);
+					bottomHeight = CDTexture[location + 3] + CDTexture[location + 2];
 
-				// 1D Height Texture for setting vegtation values
-				/*if (centerHeight < 0.1f / HEIGHT_SCALING_VALUE) {
-					CDTexture[location + 2] = vegetationValue;
-					CDTexture[location + 3] -= vegetationValue;
-				}*/
-				
-				if (totalHeightDifference < MAX_HEIGHT_DIFFERENCE) {
-					percentage = min(1.0f, ((MAX_HEIGHT_DIFFERENCE - totalHeightDifference) / MAX_HEIGHT_DIFFERENCE) + 0.4f);
-					vegetationValue *= percentage;
-					CDTexture[location + 2] = vegetationValue;
-					CDTexture[location + 3] -= vegetationValue;
+					lrHeightDifference = abs(leftHeight - rightHeight);
+					tbHeightDifference = abs(topHeight - bottomHeight);
+
+					totalHeightDifference = lrHeightDifference + tbHeightDifference;
+
+					// 1D Height Texture for setting vegtation values
+					/*if (centerHeight < 0.1f / HEIGHT_SCALING_VALUE) {
+						CDTexture[location + 2] = vegetationValue;
+						CDTexture[location + 3] -= vegetationValue;
+					}*/
+
+					if (totalHeightDifference < MAX_HEIGHT_DIFFERENCE) {
+						percentage = min(1.0f, ((MAX_HEIGHT_DIFFERENCE - totalHeightDifference) / MAX_HEIGHT_DIFFERENCE) + 0.4f);
+						vegetationValue *= percentage;
+						CDTexture[location + 2] = vegetationValue;
+						CDTexture[location + 3] -= vegetationValue;
+					}
 				}
 			}
 		}
@@ -1258,14 +1227,40 @@ void GenerateBaseTextures(unsigned int width, unsigned int height) {
 void GenerateSquarePillar(unsigned int width, unsigned int height) {
 	unsigned int location;
 	float terrainValue;
+	float vegetationValue;
 
 	for (unsigned int j = 0; j < height; j++) {
 		for (unsigned int i = 0; i < width; i++) {
 			location = GetLocation(i, j);
 			terrainValue = 0.0f;
+			vegetationValue = 0.0f;
 
-			if (i > width * 0.45f && i < width * 0.55f && j > height * 0.45f && j < height * 0.55f) {
-				terrainValue = 0.1f;
+			if (i > width * 0.48f && i < width * 0.52f && j > height * 0.48f && j < height * 0.52f) {
+				if (isVegetation) {
+					vegetationValue = maxVegetationValue;
+					terrainValue = 0.1f;
+				}
+				else {
+					terrainValue = 0.2f;
+				}
+			}
+			else if (i > width * 0.38f && i < width * 0.42f && j > height * 0.58f && j < height * 0.62f) {
+				if (isVegetation) {
+					vegetationValue = maxVegetationValue;
+					terrainValue = 0.1f;
+				}
+				else {
+					terrainValue = 0.2f;
+				}
+			}
+			else if (i > width * 0.58f && i < width * 0.62f && j > height * 0.38f && j < height * 0.42f) {
+				if (isVegetation) {
+					vegetationValue = maxVegetationValue;
+					terrainValue = 0.1f;
+				}
+				else {
+					terrainValue = 0.2f;
+				}
 			}
 
 			//////////////////////////////
@@ -1278,7 +1273,7 @@ void GenerateSquarePillar(unsigned int width, unsigned int height) {
 			//////////////////////////////
 			CDTexture[location + 0] = 0.0f;
 			CDTexture[location + 1] = 0.0f;
-			CDTexture[location + 2] = 0.0f;
+			CDTexture[location + 2] = vegetationValue;
 			CDTexture[location + 3] = terrainValue;
 
 			////////////////////////////////////////////////////

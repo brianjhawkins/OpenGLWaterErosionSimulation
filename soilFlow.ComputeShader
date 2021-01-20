@@ -15,6 +15,8 @@ uniform float vegetationTalusAngle;
 uniform float maxVegetationValue;
 uniform float Kt;
 uniform float pipeLength;
+uniform float cellSeparation;
+uniform float diagCellSeparation;
 uniform float width;
 uniform float height;
 uniform float timeStep;
@@ -88,16 +90,7 @@ void main()
 		float tempTalusAngle;
 		
 		float radianTalusAngle;
-		// If vegetation exists at point
-		if(centerColumnData.b > 0){
-			radianTalusAngle = mix(terrainTalusAngle, vegetationTalusAngle, (centerColumnData.b / maxVegetationValue)) * 0.01745329f; // Converting Degrees to Radians
-		}
-		else{
-			radianTalusAngle = terrainTalusAngle * 0.01745329f; // Converting Degrees to Radians
-		}
-
-		float cellSeparation = 1.0f / width;
-		float diagCellSeparation = cellSeparation * 1.414213562373095f;
+		radianTalusAngle = mix(terrainTalusAngle, vegetationTalusAngle, (centerColumnData.b / maxVegetationValue)) * 0.01745329f; // Converting Degrees to Radians
 
 		// Left
 		tempHeightDifference = HeightDifference(centerHeight, leftHeight);

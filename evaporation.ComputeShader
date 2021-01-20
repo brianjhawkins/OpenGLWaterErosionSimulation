@@ -6,6 +6,7 @@ layout(rgba32f, binding = 0) uniform image2D CD_image_output;
 layout(rgba32f, binding = 1) uniform image2D CD_image;
 
 uniform float evaporationConstant;
+uniform float maxVegetationValue;
 
 uniform float timeStep;
 
@@ -19,7 +20,7 @@ void main()
 	float newWaterHeight;
 
 	// Evaporation constant
-	float Ke = evaporationConstant * (1 + vegetationValue);
+	float Ke = evaporationConstant * (1 + ((vegetationValue / maxVegetationValue) * 0.8));
 
 	newWaterHeight = columnData.r * (1 - Ke * timeStep);
 	if(newWaterHeight < 0.0001f){

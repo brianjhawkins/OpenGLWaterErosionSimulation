@@ -110,6 +110,21 @@ public:
 		updateCameraVectors();
 	}
 
+	void SetYawAndPitch(float yaw, float pitch) {
+		Yaw = yaw;
+		Pitch = pitch;
+
+		if (Pitch > 89.0f) {
+			Pitch = 89.0f;
+		}
+
+		if (Pitch < -89.0f) {
+			Pitch = -89.0f;
+		}
+
+		updateCameraVectors();
+	}
+
 	// Processes input received from a mouse scroll-wheel event. Only requires input on the vertical wheel-axis.
 	void ProcessMouseScroll(float yoffset) {
 		if (Zoom >= 1.0f && Zoom <= 45.0f) {

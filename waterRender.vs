@@ -63,19 +63,19 @@ void main()
 	float topHeight = Height(topColumnData, topWaterData);
 	float bottomHeight = Height(bottomColumnData, bottomWaterData);
 
-	if(leftColumnData.r == 0){
+	if(leftColumnData.r <= 0){
 		leftHeight = centerHeight;
 	}
 
-	if(rightColumnData.r == 0){
+	if(rightColumnData.r <= 0){
 		rightHeight = centerHeight;
 	}
 
-	if(topColumnData.r == 0){
+	if(topColumnData.r <= 0){
 		topHeight = centerHeight;
 	}
 
-	if(bottomColumnData.r == 0){
+	if(bottomColumnData.r <= 0){
 		bottomHeight = centerHeight;
 	}
 

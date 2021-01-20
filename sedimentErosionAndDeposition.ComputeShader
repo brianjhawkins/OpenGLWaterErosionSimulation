@@ -99,44 +99,49 @@ void main()
 
 		float sedimentCapacity = Kc * sin(localTiltAngle) * length(centerVelocity.rg) * ErosionRamp(centerColumnData.r);
 
+		float sedimentChangeAmount;
+		float centerSedimentValue = SedimentValue(centerWaterData);
+		float proportionDeadVegetationSediment = 0;
+		float proportionTerrainSediment = 0;
+		if(centerSedimentValue > 0){
+			proportionDeadVegetationSediment = newDeadVegetationSedimentValue / centerSedimentValue;
+			proportionTerrainSediment = 1.0f - proportionDeadVegetationSediment;
+		}
+
+		if(centerColumnData.r == 0){
+			newDeadVegetationHeight += newDeadVegetationSedimentValue;
+			newDeadVegetationSedimentValue = 0;
+			newTerrainHeight += newSedimentValue;
+			newSedimentValue = 0;
+		}
 		// If sediment capacity of water is greater than current amount of sediment dissolved into water
 		// dissolve some more terrain into the water and adjust terrain height and sediment value accordingly
-		float sedimentChangeAmount;
-		if(sedimentCapacity > SedimentValue(centerWaterData)){
-			sedimentChangeAmount = Ks * (sedimentCapacity - SedimentValue(centerWaterData));
+		else if(sedimentCapacity > centerSedimentValue){
+			sedimentChangeAmount = Ks * (sedimentCapacity - centerSedimentValue);
 			newWaterHeight += sedimentChangeAmount;
 
-			if(newDeadVegetationHeight >= (sedimentChangeAmount / 2)){
-				newDeadVegetationHeight -= (sedimentChangeAmount / 2);
-				newTerrainHeight -= (sedimentChangeAmount / 2);
-				newSedimentValue += (sedimentChangeAmount / 2);
-				newDeadVegetationSedimentValue += (sedimentChangeAmount / 2);
+			if(newDeadVegetationHeight >= sedimentChangeAmount){
+				newDeadVegetationHeight -= sedimentChangeAmount;
+				newDeadVegetationSedimentValue += sedimentChangeAmount;
 			}
 			else{
+				sedimentChangeAmount -= newDeadVegetationHeight;
 				newDeadVegetationSedimentValue += newDeadVegetationHeight;
-				newTerrainHeight -= (sedimentChangeAmount - newDeadVegetationHeight);
-				newSedimentValue += (sedimentChangeAmount - newDeadVegetationHeight);
 				newDeadVegetationHeight = 0;
+				newTerrainHeight -= sedimentChangeAmount;
+				newSedimentValue += sedimentChangeAmount;
 			}
 		}
 		// If sediment capacity of water is not greater than current amount of sediment dissolved into water
 		// release some sediment back into the terrain and adjust terrain height and sediment value accordingly
 		else{
-			sedimentChangeAmount = Kd * (SedimentValue(centerWaterData) - sedimentCapacity);
+			sedimentChangeAmount = Kd * (centerSedimentValue - sedimentCapacity);
 			newWaterHeight -= sedimentChangeAmount;
 
-			if(newDeadVegetationSedimentValue >= (sedimentChangeAmount / 2)){
-				newDeadVegetationHeight += (sedimentChangeAmount / 2);
-				newTerrainHeight += (sedimentChangeAmount / 2);
-				newSedimentValue -= (sedimentChangeAmount / 2);
-				newDeadVegetationSedimentValue -= (sedimentChangeAmount / 2);
-			}
-			else{
-				newDeadVegetationHeight += newDeadVegetationSedimentValue;
-				newTerrainHeight += (sedimentChangeAmount - newDeadVegetationSedimentValue);
-				newSedimentValue -= (sedimentChangeAmount - newDeadVegetationSedimentValue);
-				newDeadVegetationSedimentValue = 0;
-			}
+			newDeadVegetationHeight += sedimentChangeAmount * proportionDeadVegetationSediment;
+			newTerrainHeight += sedimentChangeAmount * proportionTerrainSediment;
+			newSedimentValue -= sedimentChangeAmount * proportionTerrainSediment;
+			newDeadVegetationSedimentValue -= sedimentChangeAmount * proportionDeadVegetationSediment;
 		}
 	}
 

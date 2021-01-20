@@ -13,7 +13,7 @@ uniform float timeStep;
 
 float LinearInterpolation(float xCoordinate, float yCoordinate, ivec2 bL, ivec2 bR, ivec2 tL, ivec2 tR, vec4 sedimentValues){
 	float topXInterpolation = ((tR.x - xCoordinate) * sedimentValues.z) + ((xCoordinate - tL.x) * sedimentValues.w);
-	float bottomXInterpolation = ((bR.x - xCoordinate) * sedimentValues.x) + ((xCoordinate - bL.x) * sedimentValues.y);
+	float bottomXInterpolation = ((bR.x - xCoordinate)* sedimentValues.x) + ((xCoordinate - bL.x) * sedimentValues.y);
 
 	return ((tL.y - yCoordinate) * bottomXInterpolation) + ((yCoordinate - bL.y) * topXInterpolation);
 }
@@ -68,10 +68,10 @@ void main()
 		float topLeftDeadVegetationSediment = imageLoad(W_image, topLeft).g;
 		float topRightDeadVegetationSediment = imageLoad(W_image, topRight).g;
 
-		vec4 DeadVegetationSedimentValues = vec4(bottomLeftDeadVegetationSediment, bottomRightDeadVegetationSediment, topLeftDeadVegetationSediment, topRightDeadVegetationSediment);
+		vec4 deadVegetationSedimentValues = vec4(bottomLeftDeadVegetationSediment, bottomRightDeadVegetationSediment, topLeftDeadVegetationSediment, topRightDeadVegetationSediment);
 
 		newSedimentValue = LinearInterpolation(xCoordinate, yCoordinate, bottomLeft, bottomRight, topLeft, topRight, sedimentValues);
-		newDeadVegetationSedimentValue = LinearInterpolation(xCoordinate, yCoordinate, bottomLeft, bottomRight, topLeft, topRight, DeadVegetationSedimentValues);
+		newDeadVegetationSedimentValue = LinearInterpolation(xCoordinate, yCoordinate, bottomLeft, bottomRight, topLeft, topRight, deadVegetationSedimentValues);
 	}
 
 	imageStore(W_image_output, pixelCoords, vec4(newSedimentValue, newDeadVegetationSedimentValue, waterData.b, waterData.a));

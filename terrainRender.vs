@@ -9,6 +9,7 @@ uniform mat4 projection;
 uniform sampler2D columnDataTexture;
 uniform sampler2D waterDataTexture;
 uniform float size;
+uniform float maxVegetationValue;
 
 uniform vec3 terrainColor;
 uniform vec3 vegetationColor;
@@ -53,11 +54,11 @@ void main()
 
 	vec3 tempTerrainColor = terrainColor;
 	if(columnDataTextureValue.b > 0){
-		tempTerrainColor = mix(tempTerrainColor, vegetationColor, columnDataTextureValue.b * 10);
+		tempTerrainColor = mix(tempTerrainColor, vegetationColor, (columnDataTextureValue.b / maxVegetationValue));
 	}
 
 	if(waterDataTextureValue.a > 0){
-		tempTerrainColor = mix(tempTerrainColor, deadVegetationColor, waterDataTextureValue.a * 10);
+		tempTerrainColor = mix(tempTerrainColor, deadVegetationColor, waterDataTextureValue.a / maxVegetationValue);
 	}
 
 	VertexColor = tempTerrainColor;
