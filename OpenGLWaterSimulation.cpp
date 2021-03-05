@@ -26,6 +26,7 @@ vector<unsigned int> GenerateMeshIndices(unsigned int width, unsigned int height
 void GenerateMeshTextures(unsigned int width, unsigned int height);
 void GenerateBaseTextures(unsigned int width, unsigned int height);
 void GenerateSquarePillar(unsigned int width, unsigned int height);
+void GenerateSphere(unsigned int width, unsigned int height);
 unsigned int GetLocation(unsigned int i, unsigned int j);
 
 // window settings
@@ -52,15 +53,19 @@ vector<float> meshVertices;
 
 // Camera just above the ground, focusing on distinction between vegetated and non-vegetated erosion
 //Camera camera(glm::vec3(-1.0f * MESH_TOTAL_SIZE / 2.0f, 0.02f * MESH_TOTAL_SIZE, -1.1f * MESH_TOTAL_SIZE / 2.0f), glm::vec3(0, 1, 0), 50, -15);
+//Camera camera(glm::vec3(-0.43f * MESH_TOTAL_SIZE / 2.0f, 0.003f * MESH_TOTAL_SIZE, -0.37f * MESH_TOTAL_SIZE / 2.0f), glm::vec3(0, 1, 0), 75, -15);
 
 // Camera zoomed in on three pillars
-//Camera camera(glm::vec3(-0.7f * MESH_TOTAL_SIZE / 2.0f, 0.4f * MESH_TOTAL_SIZE, -0.7f * MESH_TOTAL_SIZE / 2.0f), glm::vec3(0, 1, 0), 45, -35);
+//Camera camera(glm::vec3(-0.6f * MESH_TOTAL_SIZE / 2.0f, 0.3f * MESH_TOTAL_SIZE, -0.6f * MESH_TOTAL_SIZE / 2.0f), glm::vec3(0, 1, 0), 45, -35);
 
 // Camera zoomed in on entire terrain
 //Camera camera(glm::vec3(-1.5f * MESH_TOTAL_SIZE / 2.0f, 1.3f * MESH_TOTAL_SIZE, -1.5f * MESH_TOTAL_SIZE / 2.0f), glm::vec3(0, 1, 0), 45, -55);
 
 // Camera focused on entire terrain focusing on a single edge
 Camera camera(glm::vec3(-1.8f * MESH_TOTAL_SIZE / 2.0f, 0.8f * MESH_TOTAL_SIZE, 0.0f), glm::vec3(0, 1, 0), 0, -45);
+
+// Camera zoomed-in on sphere terrain source flow
+//Camera camera(glm::vec3(-0.8f * MESH_TOTAL_SIZE / 2.0f, 0.3f * MESH_TOTAL_SIZE, -0.8f * MESH_TOTAL_SIZE / 2.0f), glm::vec3(0, 1, 0), 45, -35);
 
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
@@ -97,17 +102,19 @@ bool drawPolygon = false;
 glm::vec3 lightDirection(-1.0, -1.0, -1.0);
 
 // Movie Mode Setting
-bool isMovieMode = true;
+bool isMovieMode = false;
+bool isCameraMoving = false;
 
 // Vegetation Boolean Values
-bool isVegetation = false;
+bool isVegetation = true;
 bool isVegetationSeed = false;
 
 // Terrain Generation Settings
-const int terrainSeed = 8675309;
+const int terrainSeed = 8675309; //4120412;
 const int vegetationSeed = 1337;
 float maxVegetationValue = 0.0035f;
 const bool isSquarePillarTerrain = false;
+const bool isSphereTerrain = false;
 
 // Terrain Rendering Fragment Shader Values
 const float baseTerrainAmplitude = 0.1f;
@@ -283,14 +290,26 @@ int main()
 	waterIncrementComputeShader.setFloat("timeStep", TIME_STEP);
 	// set source values
 	waterIncrementComputeShader.setInt("currentNumberSources", 2);
-	// Source 1
-	waterIncrementComputeShader.setIVec2("sources[0].position", (int)(0.25f * MESH_WIDTH), (int)(0.25f * MESH_HEIGHT));
-	waterIncrementComputeShader.setInt("sources[0].radius", MESH_WIDTH / 20);
-	waterIncrementComputeShader.setFloat("sources[0].Kis", 0.5f);
-	// Source 2
-	waterIncrementComputeShader.setIVec2("sources[1].position", (int)(0.75f * MESH_WIDTH), (int)(0.75f * MESH_HEIGHT));
-	waterIncrementComputeShader.setInt("sources[1].radius", MESH_WIDTH / 40);
-	waterIncrementComputeShader.setFloat("sources[1].Kis", 0.75f);
+	if (isSphereTerrain) {
+		// Source 1
+		waterIncrementComputeShader.setIVec2("sources[0].position", (int)(0.45f * MESH_WIDTH), (int)(0.45f * MESH_HEIGHT));
+		waterIncrementComputeShader.setInt("sources[0].radius", MESH_WIDTH / 80);
+		waterIncrementComputeShader.setFloat("sources[0].Kis", 0.3f);
+		// Source 2
+		waterIncrementComputeShader.setIVec2("sources[1].position", (int)(0.65f * MESH_WIDTH), (int)(0.65f * MESH_HEIGHT));
+		waterIncrementComputeShader.setInt("sources[1].radius", MESH_WIDTH / 80);
+		waterIncrementComputeShader.setFloat("sources[1].Kis", 0.3f);
+	}
+	else {
+		// Source 1
+		waterIncrementComputeShader.setIVec2("sources[0].position", (int)(0.25f * MESH_WIDTH), (int)(0.25f * MESH_HEIGHT));
+		waterIncrementComputeShader.setInt("sources[0].radius", MESH_WIDTH / 20);
+		waterIncrementComputeShader.setFloat("sources[0].Kis", 0.5f);
+		// Source 2
+		waterIncrementComputeShader.setIVec2("sources[1].position", (int)(0.75f * MESH_WIDTH), (int)(0.75f * MESH_HEIGHT));
+		waterIncrementComputeShader.setInt("sources[1].radius", MESH_WIDTH / 40);
+		waterIncrementComputeShader.setFloat("sources[1].Kis", 0.75f);
+	}
 	// set rain value
 	waterIncrementComputeShader.setInt("currentNumberRaindrops", numberOfRaindrops);
 	// Set source flow boolean
@@ -633,29 +652,36 @@ int main()
 		glClearColor(0.8f, 0.8f, 0.8f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		if (isMovieMode) {
-			if (cameraChange == 0 && glfwGetTime() > 20) {
-				camera.Position = glm::vec3(-1.0f * MESH_TOTAL_SIZE / 2.0f, 0.02f * MESH_TOTAL_SIZE, -1.1f * MESH_TOTAL_SIZE / 2.0f);
-				camera.SetYawAndPitch(50, -15);
-				cameraChange++;
-			}
+		if (isMovieMode && isCameraMoving) {
+			if (isSquarePillarTerrain) {
+				if (glfwGetTime() > 120) {
+					float radius = 2.0f;
+					float speed = 0.1f;
+					float camX = sin((glfwGetTime() - 18) * speed) * radius;
+					float camZ = cos((glfwGetTime() - 18) * speed) * radius;
 
-			if (cameraChange == 1 && glfwGetTime() > 120) {
-				camera.Position = glm::vec3(-1.8f * MESH_TOTAL_SIZE / 2.0f, 0.8f * MESH_TOTAL_SIZE, 0.0f), glm::vec3(0, 1, 0);
-				camera.SetYawAndPitch(0, -45);
-				cameraChange++;
-			}
-
-			if (cameraChange == 2 && glfwGetTime() > 130) {
-				float radius = 3.0f;
-				float speed = 0.1f;
-				float camX = sin((glfwGetTime() - 130) * speed) * radius;
-				float camZ = cos((glfwGetTime() - 130) * speed) * radius;
-
-				view = glm::lookAt(glm::vec3(camX, 1.0f, camZ), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+					view = glm::lookAt(glm::vec3(camX, 1.0f, camZ), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+				}
+				else {
+					view = camera.GetViewMatrix();
+				}
 			}
 			else {
-				view = camera.GetViewMatrix();
+				float camX;
+				float camZ;
+				if (cameraChange == 0 && glfwGetTime() > 10) {
+					float radius = 3.0f;
+					float speed = 0.1f;
+					if (glfwGetTime() < 30) {
+						camX = sin((glfwGetTime() - 10) * speed) * radius;
+						camZ = cos((glfwGetTime() - 10) * speed) * radius;
+					}
+
+					view = glm::lookAt(glm::vec3(camX, 1.0f, camZ), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+				}
+				else {
+					view = camera.GetViewMatrix();
+				}
 			}
 		}
 		else {
@@ -932,11 +958,14 @@ vector<unsigned int> GenerateMeshIndices(unsigned int width, unsigned int height
 }
 
 void GenerateMeshTextures(unsigned int width, unsigned int height) {
-	if (!isSquarePillarTerrain) {
-		GenerateBaseTextures(width, height);
+	if(isSquarePillarTerrain){
+		GenerateSquarePillar(width, height);
+	}
+	else if (isSphereTerrain) {
+		GenerateSphere(width, height);
 	}
 	else {
-		GenerateSquarePillar(width, height);
+		GenerateBaseTextures(width, height);
 	}
 
 	// create texture for initial terrain data
@@ -1238,29 +1267,102 @@ void GenerateSquarePillar(unsigned int width, unsigned int height) {
 			if (i > width * 0.48f && i < width * 0.52f && j > height * 0.48f && j < height * 0.52f) {
 				if (isVegetation) {
 					vegetationValue = maxVegetationValue;
-					terrainValue = 0.1f;
 				}
-				else {
-					terrainValue = 0.2f;
-				}
+				
+				terrainValue = 0.1f - vegetationValue;
 			}
-			else if (i > width * 0.38f && i < width * 0.42f && j > height * 0.58f && j < height * 0.62f) {
+			else if (i > width * 0.42f && i < width * 0.46f && j > height * 0.54f && j < height * 0.58f) {
 				if (isVegetation) {
 					vegetationValue = maxVegetationValue;
-					terrainValue = 0.1f;
 				}
-				else {
-					terrainValue = 0.2f;
-				}
+				
+				terrainValue = 0.1f - vegetationValue;
 			}
-			else if (i > width * 0.58f && i < width * 0.62f && j > height * 0.38f && j < height * 0.42f) {
+			else if (i > width * 0.54f && i < width * 0.58f && j > height * 0.42f && j < height * 0.46f) {
 				if (isVegetation) {
 					vegetationValue = maxVegetationValue;
-					terrainValue = 0.1f;
 				}
-				else {
-					terrainValue = 0.2f;
+				
+				terrainValue = 0.1f - vegetationValue;
+			}
+
+			//////////////////////////////
+			// Initial Column Data Texture (CDTexture)
+			//////////////////////////////
+			// R = water height value
+			// G = regolith height value
+			// B = vegetation height value
+			// A = terrain height value
+			//////////////////////////////
+			CDTexture[location + 0] = 0.0f;
+			CDTexture[location + 1] = 0.0f;
+			CDTexture[location + 2] = vegetationValue;
+			CDTexture[location + 3] = terrainValue;
+
+			////////////////////////////////////////////////////
+			// All of the textures below are initially empty (0)
+			////////////////////////////////////////////////////
+
+			//////////////////////////////
+			// Initial Water Data Texture (WTexture)
+			//////////////////////////////
+			// R = terrain sediment value
+			// G = dead vegetation sediment value
+			// B = time covered in water value
+			// A = dead vegetation height value
+			//////////////////////////////
+			//////////////////////////////
+			// Initial Flux Texture (FTexture)
+			//////////////////////////////
+			// R = left flux value
+			// G = right flux value
+			// B = top flux value
+			// A = bottom flux value
+			//////////////////////////////
+			//////////////////////////////
+			// Initial Velocity Texture (VTexture)
+			//////////////////////////////
+			// R = velocity in x-direction
+			// G = velocity in y-direction
+			// B = 
+			// A = 
+			//////////////////////////////
+			EmptyTexture[location + 0] = 0.0f;
+			EmptyTexture[location + 1] = 0.0f;
+			EmptyTexture[location + 2] = 0.0f;
+			EmptyTexture[location + 3] = 0.0f;
+		}
+	}
+}
+
+void GenerateSphere(unsigned int width, unsigned int height) {
+	unsigned int location;
+	float terrainValue;
+	float vegetationValue;
+	int centerX = width / 2;
+	int centerY = height / 2;
+	int cellRadius = width / 3;
+	float heightRadius = 0.1f;
+	int x;
+	int y;
+	float hypotenuse;
+
+	for (unsigned int j = 0; j < height; j++) {
+		for (unsigned int i = 0; i < width; i++) {
+			location = GetLocation(i, j);
+			terrainValue = 0.0f;
+			vegetationValue = 0.0f;
+
+			x = (i - centerX) * (i - centerX);
+			y = (j - centerY) * (j - centerY);
+			hypotenuse = x + y;
+
+			if (hypotenuse <= cellRadius * cellRadius) {
+				float percentage = sqrt(cellRadius * cellRadius - hypotenuse) / cellRadius;
+				if (isVegetation) {
+					vegetationValue = percentage * maxVegetationValue;
 				}
+				terrainValue = percentage * heightRadius - vegetationValue;
 			}
 
 			//////////////////////////////
