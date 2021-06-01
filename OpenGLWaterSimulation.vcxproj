@@ -19,57 +19,77 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="FastNoise.cpp" />
     <ClCompile Include="glad.c" />
     <ClCompile Include="OpenGLWaterSimulation.cpp" />
     <ClCompile Include="stb_image.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="4.6.lampShader.fs" />
-    <None Include="4.6.lampShader.vs" />
-    <None Include="4.6.lightingShader.fs" />
-    <None Include="4.6.lightingShader.vs" />
+    <None Include="heightUpdate.ComputeShader" />
+    <None Include="regolithFluxUpdate.ComputeShader" />
+    <None Include="regolithHeightUpdate.ComputeShader" />
+    <None Include="Shaders\4.6.lampShader.fs" />
+    <None Include="Shaders\4.6.lampShader.vs" />
+    <None Include="Shaders\4.6.lightingShader.fs" />
+    <None Include="Shaders\4.6.lightingShader.vs" />
+    <None Include="4.6.model_loading.fs" />
+    <None Include="4.6.model_loading.vs" />
+    <None Include="Shaders\4.6.shader.fs" />
+    <None Include="Shaders\4.6.shader.vs" />
+    <None Include="evaporation.ComputeShader" />
+    <None Include="fluxUpdate.ComputeShader" />
+    <None Include="sedimentErosionAndDeposition.ComputeShader" />
+    <None Include="sedimentTransportation.ComputeShader" />
+    <None Include="soilFlow.ComputeShader" />
+    <None Include="soilFlowDeposition.ComputeShader" />
+    <None Include="swapBuffers.ComputeShader" />
+    <None Include="terrainRender.fs" />
+    <None Include="terrainRender.vs" />
+    <None Include="velocityFieldUpdate.ComputeShader" />
+    <None Include="waterFluxUpdate.ComputeShader" />
+    <None Include="waterHeightUpdate.ComputeShader" />
+    <None Include="waterIncrement.ComputeShader" />
+    <None Include="waterRender.fs" />
+    <None Include="waterRender.vs" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="camera.h" />
+    <ClInclude Include="FastNoise.h" />
     <ClInclude Include="Mesh.h" />
     <ClInclude Include="Model.h" />
     <ClInclude Include="shader.h" />
     <ClInclude Include="stb_image.h" />
   </ItemGroup>
-  <ItemGroup>
-    <Image Include="awesomeface.png" />
-    <Image Include="container.jpg" />
-  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>15.0</VCProjectVersion>
     <ProjectGuid>{7978897D-DF2A-40DD-A783-27173E855E73}</ProjectGuid>
     <RootNamespace>OpenGLWaterSimulation</RootNamespace>
-    <WindowsTargetPlatformVersion>10.0.17763.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v141</PlatformToolset>
+    <PlatformToolset>v142</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
@@ -92,16 +112,17 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <IncludePath>C:\Users\bjhawkins\Desktop\OpenGL Libraries\Includes;$(IncludePath)</IncludePath>
-    <LibraryPath>C:\Users\bjhawkins\Desktop\OpenGL Libraries\Libs;$(LibraryPath)</LibraryPath>
+    <IncludePath>C:\Users\Brian\Desktop\OpenGL Libraries\Includes;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\Users\Brian\Desktop\OpenGL Libraries\Libs;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <IncludePath>C:\Users\bjhawkins\Desktop\OpenGL Libraries\Includes;$(IncludePath)</IncludePath>
-    <LibraryPath>C:\Users\bjhawkins\Desktop\OpenGL Libraries\Libs;$(LibraryPath)</LibraryPath>
+    <IncludePath>C:\Users\Brian\Desktop\OpenGL Libraries\Includes;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\Users\Brian\Desktop\OpenGL Libraries\Libs;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IncludePath>C:\Users\bjhawkins\Desktop\OpenGL Libraries\Includes;$(IncludePath)</IncludePath>
-    <LibraryPath>C:\Users\bjhawkins\Desktop\OpenGL Libraries\Libs;$(LibraryPath)</LibraryPath>
+    <IncludePath>C:\Users\Brian\Desktop\OpenGL Libraries\Includes;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\Users\Brian\Desktop\OpenGL Libraries\Libs;$(LibraryPath)</LibraryPath>
+    <LinkIncremental>true</LinkIncremental>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <IncludePath>C:\Users\bjhawkins\Desktop\OpenGL Libraries\Includes;$(IncludePath)</IncludePath>
@@ -115,7 +136,8 @@
       <ConformanceMode>true</ConformanceMode>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>opengl32.lib;glfw3.lib;assimp-vc140-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>opengl32.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <TargetMachine>MachineX86</TargetMachine>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -124,10 +146,13 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>C:\Users\Brian\Desktop\OpenGL Libraries\Includes</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>opengl32.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <TargetMachine>NotSet</TargetMachine>
+      <AdditionalDependencies>opengl32.lib;glfw3.lib;assimp-vc140-mt.lib;gwen_Debug.lib;BulletRobotics_Debug.lib;Bullet3OpenCL_clew_Debug.lib;clsocket_Debug.lib;BulletCollision_Debug.lib;HACD_Debug.lib;ConvexDecomposition_Debug.lib;GIMPACTUtils_Debug.lib;BulletXmlWorldImporter_Debug.lib;Bullet3Dynamics_Debug.lib;Bullet3Geometry_Debug.lib;OpenGLWindow_Debug.lib;Bullet2FileLoader_Debug.lib;Bullet3Collision_Debug.lib;BulletDynamics_Debug.lib;gtest_Debug.lib;LinearMath_Debug.lib;BulletSoftBody_Debug.lib;BulletExampleBrowserLib_Debug.lib;BussIK_Debug.lib;BulletWorldImporter_Debug.lib;BulletInverseDynamicsUtils_Debug.lib;BulletFileLoader_Debug.lib;Bullet3Common_Debug.lib;BulletInverseDynamics_Debug.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <TargetMachine>MachineX86</TargetMachine>
+      <AdditionalLibraryDirectories>C:\Users\Brian\Desktop\OpenGL Libraries\Libs;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -142,7 +167,7 @@
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <AdditionalDependencies>opengl32.lib;glfw3.lib;assimp-vc140-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>opengl32.lib;glfw3.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">

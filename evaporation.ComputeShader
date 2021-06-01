@@ -1,29 +1,31 @@
 #version 460 core
-layout(local_size_x = 1, local_size_y = 1) in;
+layout(local_size_x = 32, local_size_y = 32) in;
 
-layout(rgba32f, binding = 0) uniform image2D image_output;
+layout(rgba32f, binding = 0) uniform image2D CD_image_output;
 
 layout(rgba32f, binding = 1) uniform image2D CD_image;
+
+uniform float evaporationConstant;
+uniform float maxVegetationValue;
 
 uniform float timeStep;
 
 void main()
 {    
 	ivec2 pixelCoords = ivec2(gl_GlobalInvocationID.xy);
-
-	vec2 imageSize = imageSize(image_output);
     
 	vec4 columnData = imageLoad(CD_image, pixelCoords);
+	float vegetationValue = columnData.b;
 
 	float newWaterHeight;
 
 	// Evaporation constant
-	float Ke = 1;
+	float Ke = evaporationConstant * (1 + ((vegetationValue / maxVegetationValue) * 0.8));
 
 	newWaterHeight = columnData.r * (1 - Ke * timeStep);
 	if(newWaterHeight < 0.0001f){
 		newWaterHeight = 0;
 	}
 
-	imageStore(image_output, pixelCoords, vec4(newWaterHeight, columnData.g, columnData.b, columnData.a));
+	imageStore(CD_image_output, pixelCoords, vec4(newWaterHeight, columnData.g, columnData.b, columnData.a));
 }

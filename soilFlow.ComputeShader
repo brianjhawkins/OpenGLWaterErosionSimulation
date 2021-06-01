@@ -1,0 +1,185 @@
+#version 460 core
+layout(local_size_x = 32, local_size_y = 32) in;
+
+layout(rgba32f, binding = 0) uniform image2D S_image_output;
+
+layout(rgba32f, binding = 1) uniform image2D SC_image_output;
+
+layout(rgba32f, binding = 2) uniform image2D CD_image;
+
+layout(rgba32f, binding = 3) uniform image2D W_image;
+
+uniform bool isSoilFlow;
+uniform float terrainTalusAngle;
+uniform float vegetationTalusAngle;
+uniform float maxVegetationValue;
+uniform float Kt;
+uniform float pipeLength;
+uniform float cellSeparation;
+uniform float diagCellSeparation;
+uniform float width;
+uniform float height;
+uniform float timeStep;
+
+float Height(vec4 c, vec4 w){
+	return c.g + w.a + c.b + c.a;
+}
+
+float HeightDifference(float centerHeight, float adjacentHeight){
+	return centerHeight - adjacentHeight;
+}
+
+float HeightDifference(vec4 centerColumnData, vec4 centerWater, vec4 adjacentColumn, vec4 adjacentWater){
+	return HeightDifference(Height(centerColumnData, centerWater), Height(adjacentColumn, adjacentWater));
+}
+
+void main()
+{   
+	ivec2 pixelCoords = ivec2(gl_GlobalInvocationID.xy);
+
+	float newLeftValue = 0;
+	float newRightValue = 0;
+	float newTopValue = 0;
+	float newBottomValue = 0;
+	
+	float newBottomLeftValue = 0;
+	float newBottomRightValue = 0;
+	float newTopLeftValue = 0;
+	float newTopRightValue = 0;
+
+	if(isSoilFlow){
+		ivec2 deltaX = ivec2(1, 0);
+		ivec2 deltaY = ivec2(0, 1);
+
+		vec4 centerColumnData = imageLoad(CD_image, pixelCoords);
+		vec4 centerWaterData = imageLoad(W_image, pixelCoords);
+
+		float centerHeight = Height(centerColumnData, centerWaterData);
+
+		vec4 leftColumnData = imageLoad(CD_image, pixelCoords - deltaX);
+		vec4 leftWaterData = imageLoad(W_image, pixelCoords - deltaX);
+		vec4 rightColumnData = imageLoad(CD_image, pixelCoords + deltaX);
+		vec4 rightWaterData = imageLoad(W_image, pixelCoords + deltaX);
+		vec4 topColumnData = imageLoad(CD_image, pixelCoords + deltaY);
+		vec4 topWaterData = imageLoad(W_image, pixelCoords + deltaY);
+		vec4 bottomColumnData = imageLoad(CD_image, pixelCoords - deltaY);
+		vec4 bottomWaterData = imageLoad(W_image, pixelCoords - deltaY);
+
+		float leftHeight = Height(leftColumnData, leftWaterData);
+		float rightHeight = Height(rightColumnData, rightWaterData);
+		float topHeight = Height(topColumnData, topWaterData);
+		float bottomHeight = Height(bottomColumnData, bottomWaterData);
+	
+		vec4 bottomLeftColumnData = imageLoad(CD_image, pixelCoords - deltaX - deltaY);
+		vec4 bottomLeftWaterData = imageLoad(W_image, pixelCoords - deltaX - deltaY);
+		vec4 bottomRightColumnData = imageLoad(CD_image, pixelCoords + deltaX - deltaY);
+		vec4 bottomRightWaterData = imageLoad(W_image, pixelCoords + deltaX - deltaY);
+		vec4 topLeftColumnData = imageLoad(CD_image, pixelCoords - deltaX + deltaY);
+		vec4 topLeftWaterData = imageLoad(W_image, pixelCoords - deltaX + deltaY);
+		vec4 topRightColumnData = imageLoad(CD_image, pixelCoords + deltaX + deltaY);
+		vec4 topRightWaterData = imageLoad(W_image, pixelCoords + deltaX + deltaY);
+
+		float bottomLeftHeight = Height(bottomLeftColumnData, bottomLeftWaterData);
+		float bottomRightHeight = Height(bottomRightColumnData, bottomRightWaterData);
+		float topLeftHeight = Height(topLeftColumnData, topLeftWaterData);
+		float topRightHeight = Height(topRightColumnData, topRightWaterData);
+
+		float maxHeightDifference = 0;
+		float A = 0;
+		float tempHeightDifference;
+		float tempTalusAngle;
+		
+		float radianTalusAngle;
+		radianTalusAngle = mix(terrainTalusAngle, vegetationTalusAngle, (centerColumnData.b / maxVegetationValue)) * 0.01745329f; // Converting Degrees to Radians
+
+		// Left
+		tempHeightDifference = HeightDifference(centerHeight, leftHeight);
+		tempTalusAngle = atan(tempHeightDifference, cellSeparation);
+		if(pixelCoords.x != 0 && tempTalusAngle > radianTalusAngle){
+			maxHeightDifference = max(maxHeightDifference, tempHeightDifference);
+			A += tempHeightDifference;
+			newLeftValue = tempHeightDifference;
+		}
+
+		// Right
+		tempHeightDifference = HeightDifference(centerHeight, rightHeight);
+		tempTalusAngle = atan(tempHeightDifference, cellSeparation);
+		if(pixelCoords.x != (width - 1) && tempTalusAngle > radianTalusAngle){
+			maxHeightDifference = max(maxHeightDifference, tempHeightDifference);
+			A += tempHeightDifference;
+			newRightValue = tempHeightDifference;
+		}
+
+		// Top
+		tempHeightDifference = HeightDifference(centerHeight, topHeight);
+		tempTalusAngle = atan(tempHeightDifference, cellSeparation);
+		if(pixelCoords.y != (height - 1) && tempTalusAngle > radianTalusAngle){
+			maxHeightDifference = max(maxHeightDifference, tempHeightDifference);
+			A += tempHeightDifference;
+			newTopValue = tempHeightDifference;
+		}
+
+		// Bottom
+		tempHeightDifference = HeightDifference(centerHeight, bottomHeight);
+		tempTalusAngle = atan(tempHeightDifference, cellSeparation);
+		if(pixelCoords.y != 0 && tempTalusAngle > radianTalusAngle){
+			maxHeightDifference = max(maxHeightDifference, tempHeightDifference);
+			A += tempHeightDifference;
+			newBottomValue = tempHeightDifference;
+		}
+
+		// Bottom Left
+		tempHeightDifference = HeightDifference(centerHeight, bottomLeftHeight);
+		tempTalusAngle = atan(tempHeightDifference, diagCellSeparation);
+		if(pixelCoords.x != 0 && pixelCoords.y != 0 && tempTalusAngle > radianTalusAngle){
+			maxHeightDifference = max(maxHeightDifference, tempHeightDifference);
+			A += tempHeightDifference;
+			newBottomLeftValue = tempHeightDifference;
+		}
+
+		// Bottom Right
+		tempHeightDifference = HeightDifference(centerHeight, bottomRightHeight);
+		tempTalusAngle = atan(tempHeightDifference, diagCellSeparation);
+		if(pixelCoords.x != (width - 1) && pixelCoords.y != 0 && tempTalusAngle > radianTalusAngle){
+			maxHeightDifference = max(maxHeightDifference, tempHeightDifference);
+			A += tempHeightDifference;
+			newBottomRightValue = tempHeightDifference;
+		}
+
+		// Top Left
+		tempHeightDifference = HeightDifference(centerHeight, topLeftHeight);
+		tempTalusAngle = atan(tempHeightDifference, diagCellSeparation);
+		if(pixelCoords.x != 0 && pixelCoords.y != (height - 1) && tempTalusAngle > radianTalusAngle){
+			maxHeightDifference = max(maxHeightDifference, tempHeightDifference);
+			A += tempHeightDifference;
+			newTopLeftValue = tempHeightDifference;
+		}
+
+		// Top Right
+		tempHeightDifference = HeightDifference(centerHeight, topRightHeight);
+		tempTalusAngle = atan(tempHeightDifference, diagCellSeparation);
+		if(pixelCoords.x != (width - 1) && pixelCoords.y != (height - 1) && tempTalusAngle > radianTalusAngle){
+			maxHeightDifference = max(maxHeightDifference, tempHeightDifference);
+			A += tempHeightDifference;
+			newTopRightValue = tempHeightDifference;
+		}
+
+		float columnArea = pipeLength * pipeLength;
+
+		float sedimentVolume = columnArea * timeStep * Kt * (maxHeightDifference / 2);
+
+		if(A != 0){
+			newLeftValue *= sedimentVolume / A;
+			newRightValue *= sedimentVolume / A;
+			newTopValue *= sedimentVolume / A;
+			newBottomValue *= sedimentVolume / A;
+			newBottomLeftValue *= sedimentVolume / A;
+			newBottomRightValue *= sedimentVolume / A;
+			newTopLeftValue *= sedimentVolume / A;
+			newTopRightValue *= sedimentVolume / A;
+		}
+	}
+
+	imageStore(S_image_output, pixelCoords, vec4(newLeftValue, newRightValue, newTopValue, newBottomValue));
+	imageStore(SC_image_output, pixelCoords, vec4(newBottomLeftValue, newBottomRightValue, newTopLeftValue, newTopRightValue));
+}

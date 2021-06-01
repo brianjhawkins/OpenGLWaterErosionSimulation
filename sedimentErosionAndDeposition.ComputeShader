@@ -1,64 +1,150 @@
 #version 460 core
-layout(local_size_x = 1, local_size_y = 1) in;
+layout(local_size_x = 32, local_size_y = 32) in;
 
-layout(rgba32f, binding = 0) uniform image2D image_output;
+layout(rgba32f, binding = 0) uniform image2D CD_image_output;
 
-layout(rgba32f, binding = 1) uniform image2D CD_image;
+layout(rgba32f, binding = 1) uniform image2D W_image_output;
 
-layout(rgba32f, binding = 2) uniform image2D V_image;
+layout(rgba32f, binding = 2) uniform image2D CD_image;
+
+layout(rgba32f, binding = 3) uniform image2D W_image;
+
+layout(rgba32f, binding = 4) uniform image2D V_image;
+
+uniform bool isErosion;
+uniform float Kdmax;
+// Sediment capacity constant
+uniform float Kc;
+// Sediment dissolving constant
+uniform float dissolvingConstant;
+// Sediment deposition constant
+uniform float Kd;
+uniform float width;
+uniform float height;
+uniform float maxVegetationValue;
+
+float Height(vec4 c, vec4 w){
+	return c.g + w.a + c.b + c.a;
+}
+
+float ErosionRamp(float d){
+	float rampScale;
+	
+	if(d <= 0){
+		rampScale = 0;
+	}
+	else if(d >= Kdmax){
+		rampScale = 1;
+	}
+	else{
+		rampScale = 1 - ((Kdmax - d) / Kdmax);
+	}
+
+	return rampScale;
+}
+
+float SedimentValue(vec4 waterData){
+	return waterData.r + waterData.g;
+}
 
 void main()
 {    
 	ivec2 pixelCoords = ivec2(gl_GlobalInvocationID.xy);
 
-	vec2 imageSize = imageSize(image_output);
     ivec2 deltaX = ivec2(1, 0);
 	ivec2 deltaY = ivec2(0, 1);
 
-	vec4 centerColumn = imageLoad(CD_image, pixelCoords);
+	vec4 centerColumnData = imageLoad(CD_image, pixelCoords);
+	vec4 centerWaterData = imageLoad(W_image, pixelCoords);
 	vec4 centerVelocity = imageLoad(V_image, pixelCoords);
 
-	// Sediment Capacity constant
-	float Kc = 0.005f;
+	vec4 leftColumnData = imageLoad(CD_image, pixelCoords - deltaX);
+	vec4 leftWaterData = imageLoad(W_image, pixelCoords - deltaX);
+	vec4 rightColumnData = imageLoad(CD_image, pixelCoords + deltaX);
+	vec4 rightWaterData = imageLoad(W_image, pixelCoords + deltaX);
+	vec4 topColumnData = imageLoad(CD_image, pixelCoords + deltaY);
+	vec4 topWaterData = imageLoad(W_image, pixelCoords + deltaY);
+	vec4 bottomColumnData = imageLoad(CD_image, pixelCoords - deltaY);
+	vec4 bottomWaterData = imageLoad(W_image, pixelCoords - deltaY);
+	
 	// Dissolving constant
-	float Ks = 0.003f;
-	// Deposition constant
-	float Kd = 0.003f;
+	float Ks = dissolvingConstant * (1 - ((centerColumnData.b / maxVegetationValue) * 0.8f));
 
-	float newTerrainHeight;
-	float newSedimentValue;
-	float localTiltAngle;
+	float newWaterHeight = centerColumnData.r;
+	float newTerrainHeight = centerColumnData.a;
+	float newSedimentValue = centerWaterData.r;
+	float newDeadVegetationSedimentValue = centerWaterData.g;
+	float newDeadVegetationHeight = centerWaterData.a;
 
-	// Calculate normal of vector for current point
-	vec3 normal;
-	vec2 texelSize = vec2(1.0f / imageSize.x, 1.0f / imageSize.y);
-	float leftHeight = imageLoad(CD_image, pixelCoords - deltaX).g;
-	float rightHeight = imageLoad(CD_image, pixelCoords + deltaX).g;
-	float topHeight = imageLoad(CD_image, pixelCoords + deltaY).g;
-	float bottomHeight = imageLoad(CD_image, pixelCoords - deltaY).g;
-	normal = vec3(leftHeight - rightHeight, 2 * texelSize.x, bottomHeight - topHeight);
-	normal = normalize(normal);
+	if(isErosion){
+		float localTiltAngle;
 
-	vec3 flatNormal = normalize(vec3(0.0f, 1.0f, 0.0f));
+		// Calculate normal of vector for current point
+		vec3 normal;
+		vec2 texelSize = vec2(1.0f / width, 1.0f / height);
 
-	// Dot product between vertical normal and calculated normal vectors
-	// Should be a value between -1 and 1, otherwise acos is undefined for it
-	localTiltAngle = acos(dot(flatNormal, normal));
+		float leftHeight = Height(leftColumnData, leftWaterData);
+		float rightHeight = Height(rightColumnData, rightWaterData);
+		float topHeight = Height(topColumnData, topWaterData);
+		float bottomHeight = Height(bottomColumnData, bottomWaterData);
 
-	float sedimentCapacity = Kc * sin(localTiltAngle) * length(centerVelocity);
+		normal = vec3(leftHeight - rightHeight, 2 * texelSize.x, bottomHeight - topHeight);
+		normal = normalize(normal);
 
-	// If sediment capacity of water is greater than current amount of sediment dissolved into water
-	// dissolve some more terrain into the water and adjust terrain height and sediment value accordingly
-	if(sedimentCapacity > centerColumn.b){
-		newTerrainHeight = centerColumn.g - Ks * (sedimentCapacity - centerColumn.b);
-		newSedimentValue = centerColumn.b + Ks * (sedimentCapacity - centerColumn.b);
+		vec3 flatNormal = normalize(vec3(0.0f, 1.0f, 0.0f));
+
+		// Dot product between vertical normal and calculated normal vectors
+		// Should be a value between -1 and 1, otherwise acos is undefined for it
+		localTiltAngle = acos(dot(flatNormal, normal));
+
+		float sedimentCapacity = Kc * sin(localTiltAngle) * length(centerVelocity.rg) * ErosionRamp(centerColumnData.r);
+
+		float sedimentChangeAmount;
+		float centerSedimentValue = SedimentValue(centerWaterData);
+		float proportionDeadVegetationSediment = 0;
+		float proportionTerrainSediment = 0;
+		if(centerSedimentValue > 0){
+			proportionDeadVegetationSediment = newDeadVegetationSedimentValue / centerSedimentValue;
+			proportionTerrainSediment = 1.0f - proportionDeadVegetationSediment;
+		}
+
+		if(centerColumnData.r == 0){
+			newDeadVegetationHeight += newDeadVegetationSedimentValue;
+			newDeadVegetationSedimentValue = 0;
+			newTerrainHeight += newSedimentValue;
+			newSedimentValue = 0;
+		}
+		// If sediment capacity of water is greater than current amount of sediment dissolved into water
+		// dissolve some more terrain into the water and adjust terrain height and sediment value accordingly
+		else if(sedimentCapacity > centerSedimentValue){
+			sedimentChangeAmount = Ks * (sedimentCapacity - centerSedimentValue);
+			newWaterHeight += sedimentChangeAmount;
+
+			if(newDeadVegetationHeight >= sedimentChangeAmount){
+				newDeadVegetationHeight -= sedimentChangeAmount;
+				newDeadVegetationSedimentValue += sedimentChangeAmount;
+			}
+			else{
+				sedimentChangeAmount -= newDeadVegetationHeight;
+				newDeadVegetationSedimentValue += newDeadVegetationHeight;
+				newDeadVegetationHeight = 0;
+				newTerrainHeight -= sedimentChangeAmount;
+				newSedimentValue += sedimentChangeAmount;
+			}
+		}
+		// If sediment capacity of water is not greater than current amount of sediment dissolved into water
+		// release some sediment back into the terrain and adjust terrain height and sediment value accordingly
+		else{
+			sedimentChangeAmount = Kd * (centerSedimentValue - sedimentCapacity);
+			newWaterHeight -= sedimentChangeAmount;
+
+			newDeadVegetationHeight += sedimentChangeAmount * proportionDeadVegetationSediment;
+			newTerrainHeight += sedimentChangeAmount * proportionTerrainSediment;
+			newSedimentValue -= sedimentChangeAmount * proportionTerrainSediment;
+			newDeadVegetationSedimentValue -= sedimentChangeAmount * proportionDeadVegetationSediment;
+		}
 	}
-	// If sediment capacity of water is not greater than current amount of sediment dissolved into water
-	// release some sediment back into the terrain and adjust terrain height and sediment value accordingly
-	else{
-		newTerrainHeight = centerColumn.g + Kd * (centerColumn.b - sedimentCapacity);
-		newSedimentValue = centerColumn.b - Kd * (centerColumn.b - sedimentCapacity);
-	}
 
-	imageStore(image_output, pixelCoords, vec4(centerColumn.r, newTerrainHeight, newSedimentValue, centerColumn.b));
+	imageStore(CD_image_output, pixelCoords, vec4(newWaterHeight, centerColumnData.g, centerColumnData.b, newTerrainHeight));
+	imageStore(W_image_output, pixelCoords, vec4(newSedimentValue, newDeadVegetationSedimentValue, centerWaterData.b, newDeadVegetationHeight));
 }

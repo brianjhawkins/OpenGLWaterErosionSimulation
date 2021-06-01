@@ -15,7 +15,7 @@ enum Camera_Movement {
 };
 
 const float YAW = -90.0f;
-const float PITCH = -90.0f;
+const float PITCH = -89.0f;
 const float SPEED = 2.5f;
 const float SENSITIVITY = 0.1f;
 const float ZOOM = 45.0f;
@@ -107,6 +107,21 @@ public:
 		}
 
 		// Update Front, Right, and Up Vectors using the updated Euler angles
+		updateCameraVectors();
+	}
+
+	void SetYawAndPitch(float yaw, float pitch) {
+		Yaw = yaw;
+		Pitch = pitch;
+
+		if (Pitch > 89.0f) {
+			Pitch = 89.0f;
+		}
+
+		if (Pitch < -89.0f) {
+			Pitch = -89.0f;
+		}
+
 		updateCameraVectors();
 	}
 

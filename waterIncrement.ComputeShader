@@ -1,9 +1,13 @@
 #version 460 core
-layout(local_size_x = 1, local_size_y = 1) in;
+layout(local_size_x = 32, local_size_y = 32) in;
 
-layout(rgba32f, binding = 0) uniform image2D image_output;
+layout(rgba32f, binding = 0) uniform image2D CD_image_output;
 
-layout(rgba32f, binding = 1) uniform image2D CD_image;
+layout(rgba32f, binding = 1) uniform image2D W_image_output;
+
+layout(rgba32f, binding = 2) uniform image2D CD_image;
+
+layout(rgba32f, binding = 3) uniform image2D W_image;
 
 struct Source{
 	ivec2 position;
@@ -32,6 +36,11 @@ uniform bool isRain;
 uniform int currentNumberRaindrops;
 uniform Raindrop raindrops[MAX_NUMBER_RAINDROPS];
 
+// Regolith Constant
+uniform float Km;
+
+uniform float maxVegetationValue;
+
 uniform float timeStep;
 
 bool withinSourceRadius(int sourceX, int sourceY, int sourceRadius, int x, int y){
@@ -44,12 +53,17 @@ bool withinSourceRadius(int sourceX, int sourceY, int sourceRadius, int x, int y
 void main()
 {    
 	ivec2 pixelCoords = ivec2(gl_GlobalInvocationID.xy);
-
-	vec2 imageSize = imageSize(image_output);
     
 	vec4 columnData = imageLoad(CD_image, pixelCoords);
+	vec4 waterData = imageLoad(W_image, pixelCoords);
 
-	float newWaterHeight = 0;
+	float newWaterHeight = columnData.r;
+	float newTerrainHeight = columnData.a;
+	float newRegolithHeight = columnData.g;
+	float newTimeCovered = waterData.b;
+	float newVegetationHeight = columnData.b;
+	float newDeadVegetationHeight = waterData.a;
+
 	float sourceIncrementValue = 0;
 	float rainIncrementValue = 0;
 
@@ -71,7 +85,33 @@ void main()
 		}
 	}
 
-	newWaterHeight = columnData.r + sourceIncrementValue + rainIncrementValue;
+	newWaterHeight += sourceIncrementValue + rainIncrementValue;
 
-	imageStore(image_output, pixelCoords, vec4(newWaterHeight, columnData.g, columnData.b, columnData.a));
+	// Add current regolith height back to the terrain height
+	newTerrainHeight += columnData.g;
+
+	if(newWaterHeight > 0){
+		newTimeCovered = min(2, waterData.b + timeStep);
+	}
+	else{
+		newTimeCovered = max(0, waterData.b - timeStep);
+	}
+
+	if(newWaterHeight < Km){
+		newRegolithHeight = (newWaterHeight * (1 - ((newVegetationHeight / maxVegetationValue) * 0.8f)));
+	}
+	else{
+		newRegolithHeight = (Km * (1 - ((newVegetationHeight / maxVegetationValue) * 0.8f)));
+	}
+
+	if(newTimeCovered > 1 && newVegetationHeight > 0){
+		newDeadVegetationHeight += newVegetationHeight;
+		newVegetationHeight = 0;
+	}
+
+	// Subtract new regolith height from the new terrain height
+	newTerrainHeight -= newRegolithHeight;
+
+	imageStore(CD_image_output, pixelCoords, vec4(newWaterHeight, newRegolithHeight, newVegetationHeight, newTerrainHeight));
+	imageStore(W_image_output, pixelCoords, vec4(waterData.r, waterData.g, newTimeCovered, newDeadVegetationHeight));
 }

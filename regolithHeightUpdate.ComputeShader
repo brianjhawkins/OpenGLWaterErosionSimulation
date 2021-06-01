@@ -1,28 +1,28 @@
 #version 460 core
 layout(local_size_x = 32, local_size_y = 32) in;
 
-layout(rgba32f, binding = 0) uniform image2D columndata_image_output;
+layout(rgba32f, binding = 0) uniform image2D image_output;
 
 layout(rgba32f, binding = 1) uniform image2D CD_image;
 
-layout(rgba32f, binding = 2) uniform image2D F_image;
+layout(rgba32f, binding = 2) uniform image2D R_image;
 
 uniform float timeStep;
 
 float heightDifference(vec4 center, vec4 adjacent){
-	return (center.r + center.g + center.b + center.a - adjacent.r - adjacent.g - adjacent.b - adjacent.a);
+	return (center.b + center.a - adjacent.b - adjacent.a);
 }
 
 void main()
 {    
 	ivec2 pixelCoords = ivec2(gl_GlobalInvocationID.xy);
 
-	vec2 imageSize = imageSize(columndata_image_output);
+	vec2 imageSize = imageSize(image_output);
     ivec2 deltaX = ivec2(1, 0);
 	ivec2 deltaY = ivec2(0, 1);
 
 	vec4 centerColumn = imageLoad(CD_image, pixelCoords);
-	vec4 centerFlux = imageLoad(F_image, pixelCoords);
+	vec4 centerFlux = imageLoad(R_image, pixelCoords);
 
 	float inLeft = 0;
 	float inRight = 0;
@@ -31,28 +31,32 @@ void main()
 
 	float l = 1 / imageSize.x;
 	float volumeChange;
+	float heightChange;
 
-	float newWaterHeight;
+	float newRegolithHeight;
+	float newTerrainHeight;
 
 	if(pixelCoords.x != 0){
-		inLeft = imageLoad(F_image, pixelCoords - deltaX).g;
+		inLeft = imageLoad(R_image, pixelCoords - deltaX).g;
 	}
 
 	if(pixelCoords.x != imageSize.x - 1){
-		inRight = imageLoad(F_image, pixelCoords + deltaX).r;
+		inRight = imageLoad(R_image, pixelCoords + deltaX).r;
 	}
 
 	if(pixelCoords.y != imageSize.y - 1){
-		inTop = imageLoad(F_image, pixelCoords + deltaY).a;
+		inTop = imageLoad(R_image, pixelCoords + deltaY).a;
 	}
 
 	if(pixelCoords.y != 0){
-		inBottom = imageLoad(F_image, pixelCoords - deltaY).b;
+		inBottom = imageLoad(R_image, pixelCoords - deltaY).b;
 	}
 
 	volumeChange = timeStep * ((inLeft + inRight + inTop + inBottom) - (centerFlux.r + centerFlux.g + centerFlux.b + centerFlux.a));
 
-	newWaterHeight = centerColumn.r + (volumeChange / (l * l));
+	heightChange = volumeChange / (l * l);
 
-	imageStore(columndata_image_output, pixelCoords, vec4(newWaterHeight, centerColumn.g, centerColumn.b, centerColumn.a));
+	newRegolithHeight = centerColumn.b + heightChange;
+
+	imageStore(image_output, pixelCoords, vec4(centerColumn.a, centerColumn.g, newRegolithHeight, centerColumn.a));
 }

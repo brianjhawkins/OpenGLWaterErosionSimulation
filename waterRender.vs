@@ -9,11 +9,9 @@ uniform mat4 projection;
 uniform sampler2D columnDataTexture;
 uniform sampler2D waterDataTexture;
 uniform float size;
-uniform float maxVegetationValue;
 
 uniform vec3 terrainColor;
 uniform vec3 vegetationColor;
-uniform vec3 deadVegetationColor;
 uniform vec3 waterColor;
 uniform vec3 terrainSpecularColor;
 uniform vec3 waterSpecularColor;
@@ -26,9 +24,10 @@ out vec2 TexCoords;
 out vec3 VertexColor;
 out vec3 VertexSpecularColor;
 out float VertexShininess;
+out float Opacity;
 
 float Height(vec4 c, vec4 w){
-	return (c.g + w.a + c.b + c.a) * size;
+	return (c.r + c.g + w.a + c.b + c.a) * size;
 }
 
 void main()
@@ -52,20 +51,35 @@ void main()
 	vec4 bottomColumnData = textureOffset(columnDataTexture, aTexCoords, ivec2(0, -1));
 	vec4 bottomWaterData = textureOffset(waterDataTexture, aTexCoords, ivec2(0, -1));
 
-	vec3 tempTerrainColor = terrainColor;
-	if(columnDataTextureValue.b > 0){
-		tempTerrainColor = mix(tempTerrainColor, vegetationColor, (columnDataTextureValue.b / maxVegetationValue));
+	VertexColor = mix(waterColor, terrainColor, waterDataTextureValue.r * 10);
+	VertexSpecularColor = waterSpecularColor;
+	VertexShininess = waterShininess;
+
+	Opacity = mix(0.3f, 1.0f, (waterDataTextureValue.r + waterDataTextureValue.g) * 10);
+
+	float centerHeight = newY;
+	float leftHeight = Height(leftColumnData, leftWaterData);
+	float rightHeight = Height(rightColumnData, rightWaterData);
+	float topHeight = Height(topColumnData, topWaterData);
+	float bottomHeight = Height(bottomColumnData, bottomWaterData);
+
+	if(leftColumnData.r <= 0){
+		leftHeight = centerHeight;
 	}
 
-	if(waterDataTextureValue.a > 0){
-		tempTerrainColor = mix(tempTerrainColor, deadVegetationColor, waterDataTextureValue.a / maxVegetationValue);
+	if(rightColumnData.r <= 0){
+		rightHeight = centerHeight;
 	}
 
-	VertexColor = tempTerrainColor;
-	VertexSpecularColor = terrainSpecularColor;
-	VertexShininess = terrainShininess;
+	if(topColumnData.r <= 0){
+		topHeight = centerHeight;
+	}
 
-	newNormal = vec3(Height(leftColumnData, leftWaterData) - Height(rightColumnData, rightWaterData), 2 * texelSize.x, Height(bottomColumnData, bottomWaterData) - Height(topColumnData, topWaterData));
+	if(bottomColumnData.r <= 0){
+		bottomHeight = centerHeight;
+	}
+
+	newNormal = vec3(leftHeight - rightHeight, 2 * texelSize.x, bottomHeight - topHeight);
 	newNormal = normalize(newNormal);
 
     gl_Position = projection * view * model * vec4(newPosition, 1.0);

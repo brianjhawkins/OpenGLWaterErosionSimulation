@@ -1,0 +1,92 @@
+#version 460 core
+layout(local_size_x = 32, local_size_y = 32) in;
+
+layout(rgba32f, binding = 0) uniform image2D image_output;
+
+layout(rgba32f, binding = 1) uniform image2D CD_image;
+
+layout(rgba32f, binding = 2) uniform image2D R_image;
+
+uniform float timeStep;
+
+float heightDifference(vec4 center, vec4 adjacent){
+	return max(center.a, adjacent.b + adjacent.a) - (center.b + center.a);
+}
+
+void main()
+{    
+	ivec2 pixelCoords = ivec2(gl_GlobalInvocationID.xy);
+
+	vec2 imageSize = imageSize(image_output);
+    ivec2 deltaX = ivec2(1, 0);
+	ivec2 deltaY = ivec2(0, 1);
+
+	vec4 centerColumn = imageLoad(CD_image, pixelCoords);
+	vec4 centerFlux = imageLoad(R_image, pixelCoords);
+
+	vec4 leftColumn = imageLoad(CD_image, pixelCoords - deltaX);
+	vec4 rightColumn = imageLoad(CD_image, pixelCoords + deltaX);
+	vec4 topColumn = imageLoad(CD_image, pixelCoords + deltaY);
+	vec4 bottomColumn = imageLoad(CD_image, pixelCoords - deltaY);
+
+	float leftFlux = 0;
+	float rightFlux = 0;
+	float topFlux = 0;
+	float bottomFlux = 0;
+
+	float K;
+
+	float l = 1 / imageSize.x;
+	float A = l * l;
+	float g = -imageSize.x / 2;
+	float Kf = 0.9f;
+	Kf = 1;
+	
+	// Left Flux
+	if(pixelCoords.x == 0){
+		leftFlux = 0;
+	}
+	else{
+		leftFlux = max(0, Kf * centerFlux.r + (timeStep * A * (g * heightDifference(centerColumn, leftColumn) / l)));
+	}
+
+	// Right Flux
+	if(pixelCoords.x == imageSize.x - 1){
+		rightFlux = 0;
+	}
+	else{
+		rightFlux = max(0, Kf * centerFlux.g + (timeStep * A * (g * heightDifference(centerColumn, rightColumn) / l)));
+	}
+
+	// Top Flux
+	if(pixelCoords.y == imageSize.y - 1){
+		topFlux = 0;
+	}
+	else{
+		topFlux = max(0, Kf * centerFlux.b + (timeStep * A * (g * heightDifference(centerColumn, topColumn) / l)));
+	}
+
+	// Bottom Flux
+	if(pixelCoords.y == 0){
+		bottomFlux = 0;
+	}
+	else{
+		bottomFlux = max(0, Kf * centerFlux.a + (timeStep * A * (g * heightDifference(centerColumn, bottomColumn) / l)));
+	}
+
+	// Scaling Factor K
+	if((leftFlux != 0 || rightFlux != 0 || topFlux != 0 || bottomFlux != 0) && centerColumn.r != 0){
+		K = min(1, (centerColumn.a * l * l) / ((leftFlux + rightFlux + topFlux + bottomFlux) * timeStep));
+	}
+	else{
+		K = 0;
+	}
+
+	// Scale each flux by K
+	leftFlux *= K;
+	rightFlux *= K;
+	topFlux *= K;
+	bottomFlux *= K;
+
+	imageStore(image_output, pixelCoords, vec4(leftFlux, rightFlux, topFlux, bottomFlux));
+}

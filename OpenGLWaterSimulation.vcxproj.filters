@@ -24,20 +24,45 @@
     <ClCompile Include="glad.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="FastNoise.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="4.6.lampShader.fs">
+    <None Include="4.6.model_loading.fs" />
+    <None Include="4.6.model_loading.vs" />
+    <None Include="evaporation.ComputeShader" />
+    <None Include="fluxUpdate.ComputeShader" />
+    <None Include="sedimentErosionAndDeposition.ComputeShader" />
+    <None Include="sedimentTransportation.ComputeShader" />
+    <None Include="swapBuffers.ComputeShader" />
+    <None Include="terrainRender.fs" />
+    <None Include="terrainRender.vs" />
+    <None Include="velocityFieldUpdate.ComputeShader" />
+    <None Include="waterHeightUpdate.ComputeShader" />
+    <None Include="waterIncrement.ComputeShader" />
+    <None Include="Shaders\4.6.lampShader.fs">
       <Filter>Source Files</Filter>
     </None>
-    <None Include="4.6.lampShader.vs">
+    <None Include="Shaders\4.6.lampShader.vs">
       <Filter>Source Files</Filter>
     </None>
-    <None Include="4.6.lightingShader.fs">
+    <None Include="Shaders\4.6.lightingShader.fs">
       <Filter>Source Files</Filter>
     </None>
-    <None Include="4.6.lightingShader.vs">
+    <None Include="Shaders\4.6.lightingShader.vs">
       <Filter>Source Files</Filter>
     </None>
+    <None Include="Shaders\4.6.shader.fs" />
+    <None Include="Shaders\4.6.shader.vs" />
+    <None Include="heightUpdate.ComputeShader" />
+    <None Include="waterRender.fs" />
+    <None Include="waterRender.vs" />
+    <None Include="regolithFluxUpdate.ComputeShader" />
+    <None Include="regolithHeightUpdate.ComputeShader" />
+    <None Include="waterFluxUpdate.ComputeShader" />
+    <None Include="soilFlowDeposition.ComputeShader" />
+    <None Include="soilFlow.ComputeShader" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="stb_image.h">
@@ -55,13 +80,8 @@
     <ClInclude Include="Model.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <Image Include="awesomeface.png">
-      <Filter>Source Files</Filter>
-    </Image>
-    <Image Include="container.jpg">
-      <Filter>Source Files</Filter>
-    </Image>
+    <ClInclude Include="FastNoise.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
